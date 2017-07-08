@@ -60,10 +60,6 @@ func (s *MySQLXSuite) SetupTest() {
 	s.db, err = sql.Open("mysqlx", "tcp://root:@127.0.0.1:33060/world_x")
 	s.Require().NoError(err)
 	s.Require().NoError(s.db.Ping())
-
-	var version string
-	s.Require().NoError(s.db.QueryRow("SELECT VERSION()").Scan(&version))
-	s.T().Log(version)
 }
 
 func (s *MySQLXSuite) TearDownTest() {
@@ -207,6 +203,46 @@ func (s *MySQLXSuite) TestQueryExec() {
 	s.NoError(rows.Close())
 }
 
+func (s *MySQLXSuite) TestExec() {
+	res, err := s.db.Exec("CREATE TEMPORARY TABLE TestExec (id int AUTO_INCREMENT, PRIMARY KEY (id))")
+	s.Require().NoError(err)
+	id, err := res.LastInsertId()
+	s.EqualError(err, "no LastInsertId available")
+	s.Equal(int64(0), id)
+	ra, err := res.RowsAffected()
+	s.NoError(err)
+	s.Equal(int64(0), ra)
+
+	res, err = s.db.Exec("INSERT INTO TestExec VALUES (1), (2)")
+	s.Require().NoError(err)
+	id, err = res.LastInsertId()
+	s.NoError(err)
+	s.Equal(int64(2), id)
+	ra, err = res.RowsAffected()
+	s.NoError(err)
+	s.Equal(int64(2), ra)
+
+	res, err = s.db.Exec("UPDATE TestExec SET id = ? WHERE id = ?", 3, 2)
+	s.Require().NoError(err)
+	id, err = res.LastInsertId()
+	s.EqualError(err, "no LastInsertId available")
+	s.Equal(int64(0), id)
+	ra, err = res.RowsAffected()
+	s.NoError(err)
+	s.Equal(int64(1), ra)
+}
+
+func (s *MySQLXSuite) TestExecQuery() {
+	res, err := s.db.Exec("SELECT 1")
+	s.NoError(err)
+	id, err := res.LastInsertId()
+	s.EqualError(err, "no LastInsertId available")
+	s.Equal(int64(0), id)
+	ra, err := res.RowsAffected()
+	s.NoError(err)
+	s.Equal(int64(0), ra)
+}
+
 func TestNoDatabase(t *testing.T) {
 	debugf = t.Logf
 
@@ -219,9 +255,15 @@ func TestNoDatabase(t *testing.T) {
 	require.NoError(t, db.Ping())
 
 	var s string
-	assert.NoError(t, db.QueryRow("SELECT VERSION()").Scan(&s))
+	require.NoError(t, db.QueryRow("SELECT VERSION()").Scan(&s))
+	t.Log(s)
 
 	err = db.QueryRow("SELECT Name FROM city LIMIT 1").Scan(&s)
+	assert.Equal(t, &Error{Severity: SeverityError, Code: 1046, SQLState: "3D000", Msg: "No database selected"}, err)
+	assert.Equal(t, "ERROR 1046 (3D000): No database selected", err.Error())
+
+	res, err := db.Exec("UPDATE city SET Name = ?", "Moscow")
+	assert.Nil(t, res)
 	assert.Equal(t, &Error{Severity: SeverityError, Code: 1046, SQLState: "3D000", Msg: "No database selected"}, err)
 	assert.Equal(t, "ERROR 1046 (3D000): No database selected", err.Error())
 }

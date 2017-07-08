@@ -1,8 +1,14 @@
 package mysqlx
 
 import (
+	"database/sql/driver"
 	"fmt"
 )
+
+func bugf(format string, a ...interface{}) {
+	msg := fmt.Sprintf(format, a...) + "\nPlease report this bug: https://github.com/AlekSi/mysqlx/issues\n"
+	panic(msg)
+}
 
 // Severity represents Error severity level.
 type Severity byte
@@ -42,13 +48,22 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("%s %d (%s): %s", e.Severity, e.Code, e.SQLState, e.Msg)
 }
 
+type execResult struct {
+	lastInsertId int64
+	rowsAffected int64
+}
+
+func (r execResult) LastInsertId() (int64, error) {
+	return r.lastInsertId, nil
+}
+
+func (r execResult) RowsAffected() (int64, error) {
+	return r.rowsAffected, nil
+}
+
 // check interfaces
 var (
-	_ fmt.Stringer = SeverityError
-	_ error        = (*Error)(nil)
+	_ fmt.Stringer  = SeverityError
+	_ error         = (*Error)(nil)
+	_ driver.Result = execResult{}
 )
-
-func bugf(format string, a ...interface{}) {
-	msg := fmt.Sprintf(format, a...) + "\nPlease report this bug: https://github.com/AlekSi/mysqlx/issues\n"
-	panic(msg)
-}

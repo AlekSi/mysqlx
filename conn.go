@@ -229,6 +229,74 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 	}
 }
 
+func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
+	stmt := &mysqlx_sql.StmtExecute{
+		Stmt: []byte(query),
+	}
+	for _, arg := range args {
+		stmt.Args = append(stmt.Args, marshalValue(arg))
+	}
+
+	if err := writeMessage(c.transport, stmt); err != nil {
+		return nil, c.close(err)
+	}
+
+	var result driver.Result = driver.ResultNoRows
+	for {
+		m, err := readMessage(c.transport)
+		if err != nil {
+			return nil, c.close(err)
+		}
+
+		switch m := m.(type) {
+		case *mysqlx.Error:
+			severity := Severity(m.GetSeverity())
+
+			// TODO close connection if severity is FATAL?
+
+			return nil, &Error{
+				Severity: severity,
+				Code:     m.GetCode(),
+				SQLState: m.GetSqlState(),
+				Msg:      m.GetMsg(),
+			}
+
+		// query with rows
+		case *mysqlx_resultset.ColumnMetaData:
+			continue
+		case *mysqlx_resultset.Row:
+			continue
+		case *mysqlx_resultset.FetchDone:
+			continue
+
+		// query without rows
+		case *mysqlx_notice.SessionStateChanged:
+			switch m.GetParam() {
+			case mysqlx_notice.SessionStateChanged_GENERATED_INSERT_ID:
+				ra, _ := result.RowsAffected()
+				result = execResult{
+					lastInsertId: int64(m.GetValue().GetVUnsignedInt()),
+					rowsAffected: ra,
+				}
+			case mysqlx_notice.SessionStateChanged_ROWS_AFFECTED:
+				if result == driver.ResultNoRows {
+					result = driver.RowsAffected(m.GetValue().GetVUnsignedInt())
+				}
+			case mysqlx_notice.SessionStateChanged_PRODUCED_MESSAGE:
+				// TODO log it?
+				continue
+			default:
+				bugf("unhandled session state change %v", m)
+			}
+		case *mysqlx_sql.StmtExecuteOk:
+			return result, nil
+
+		default:
+			bugf("unhandled type %T", m)
+		}
+	}
+}
+
 func writeMessage(w io.Writer, m proto.Message) error {
 	b, err := proto.Marshal(m)
 	if err != nil {
@@ -359,11 +427,11 @@ func readMessage(r io.Reader) (proto.Message, error) {
 var (
 	_ driver.Conn    = (*conn)(nil)
 	_ driver.Queryer = (*conn)(nil)
+	_ driver.Execer  = (*conn)(nil)
 
 	// TODO
 	// _ driver.ConnBeginTx        = (*conn)(nil)
 	// _ driver.ConnPrepareContext = (*conn)(nil)
-	// _ driver.Execer             = (*conn)(nil)
 	// _ driver.ExecerContext      = (*conn)(nil)
 	// _ driver.NamedValueChecker  = (*conn)(nil)
 	// _ driver.Pinger             = (*conn)(nil)
