@@ -122,6 +122,12 @@ func (c *conn) auth(database, username, password string) error {
 	if err != nil {
 		return c.close(err)
 	}
+	_ = m.(*mysqlx_notice.SessionStateChanged)
+
+	m, err = readMessage(c.transport)
+	if err != nil {
+		return c.close(err)
+	}
 	_ = m.(*mysqlx_session.AuthenticateOk)
 
 	return nil
@@ -136,6 +142,29 @@ func (c *conn) close(err error) error {
 		}
 	})
 	return c.closeErr
+}
+
+func (c *conn) Close() error {
+	if err := writeMessage(c.transport, &mysqlx_connection.Close{}); err != nil {
+		return c.close(err)
+	}
+
+	// read one next message, but do not check it is mysqlx.Ok
+	if _, err := readMessage(c.transport); err != nil {
+		return c.close(err)
+	}
+
+	return c.close(nil)
+}
+
+func (c *conn) Begin() (driver.Tx, error) {
+	bugf("Begin not implemented yet")
+	panic("not reached")
+}
+
+func (c *conn) Prepare(query string) (driver.Stmt, error) {
+	bugf("Prepare not implemented yet")
+	panic("not reached")
 }
 
 func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
@@ -183,29 +212,6 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 			bugf("unhandled type %T", m)
 		}
 	}
-}
-
-func (c *conn) Prepare(query string) (driver.Stmt, error) {
-	bugf("Prepare not implemented yet")
-	panic("not reached")
-}
-
-func (c *conn) Close() error {
-	if err := writeMessage(c.transport, &mysqlx_connection.Close{}); err != nil {
-		return c.close(err)
-	}
-
-	// read one next message, but do not check it is mysqlx.Ok
-	if _, err := readMessage(c.transport); err != nil {
-		return c.close(err)
-	}
-
-	return c.close(nil)
-}
-
-func (c *conn) Begin() (driver.Tx, error) {
-	bugf("Begin not implemented yet")
-	panic("not reached")
 }
 
 func writeMessage(w io.Writer, m proto.Message) error {
@@ -298,7 +304,7 @@ func readMessage(r io.Reader) (proto.Message, error) {
 		return nil, err
 	}
 
-	// FIXME
+	// unwrap notice frames, return variable and state changes, skip over warnings
 	if t == mysqlx.ServerMessages_NOTICE {
 		f := m.(*mysqlx_notice.Frame)
 		switch f.GetType() {
@@ -307,6 +313,10 @@ func readMessage(r io.Reader) (proto.Message, error) {
 			if err := proto.Unmarshal(f.Payload, m); err != nil {
 				return nil, err
 			}
+
+			// TODO expose warnings?
+			debugf("<-- %T %v: %T %v", f, f, m, m)
+			return readMessage(r)
 		case 2:
 			m = new(mysqlx_notice.SessionVariableChanged)
 			if err := proto.Unmarshal(f.Payload, m); err != nil {
@@ -320,8 +330,10 @@ func readMessage(r io.Reader) (proto.Message, error) {
 		default:
 			bugf("unexpected notice frame type: %v", f)
 		}
-		debugf("<-- %T %v: %T %v", f, f, m, m)
-		return readMessage(r)
+
+		if f.GetScope() != mysqlx_notice.Frame_LOCAL {
+			bugf("unexpected notice frame scope: %v", f)
+		}
 	}
 
 	debugf("<<< %T %v", m, m)

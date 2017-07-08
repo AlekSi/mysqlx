@@ -5,6 +5,7 @@ import (
 	"io"
 	"math"
 
+	"github.com/AlekSi/mysqlx/internal/mysqlx_notice"
 	"github.com/AlekSi/mysqlx/internal/mysqlx_resultset"
 	"github.com/AlekSi/mysqlx/internal/mysqlx_sql"
 )
@@ -32,6 +33,13 @@ func (r *rows) runReader() {
 			r.rows <- m
 		case *mysqlx_resultset.FetchDone:
 			continue
+		case *mysqlx_notice.SessionStateChanged:
+			switch m.GetParam() {
+			case mysqlx_notice.SessionStateChanged_ROWS_AFFECTED:
+				continue
+			default:
+				bugf("unhandled session state change %v", m)
+			}
 		case *mysqlx_sql.StmtExecuteOk:
 			return
 		default:
