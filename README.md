@@ -1,6 +1,6 @@
 # mysqlx
 
-[![GoDoc](https://godoc.org/AlekSi/mysqlx?status.svg)](https://godoc.org/AlekSi/mysqlx)
+[![GoDoc](https://godoc.org/github.com/AlekSi/mysqlx?status.svg)](https://godoc.org/github.com/AlekSi/mysqlx)
 [![Build Status](https://travis-ci.org/AlekSi/mysqlx.svg?branch=master)](https://travis-ci.org/AlekSi/mysqlx)
 [![Go Report Card](https://goreportcard.com/badge/github.com/AlekSi/mysqlx)](https://goreportcard.com/report/github.com/AlekSi/mysqlx)
 
