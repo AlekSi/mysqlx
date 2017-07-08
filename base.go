@@ -2,12 +2,18 @@ package mysqlx
 
 import (
 	"database/sql/driver"
+	"errors"
 	"fmt"
 )
 
-func bugf(format string, a ...interface{}) {
+const bug = true
+
+func bugf(format string, a ...interface{}) error {
 	msg := fmt.Sprintf(format, a...) + "\nPlease report this bug: https://github.com/AlekSi/mysqlx/issues\n"
-	panic(msg)
+	if bug {
+		panic(msg)
+	}
+	return errors.New(msg)
 }
 
 // Severity represents Error severity level.

@@ -162,7 +162,7 @@ func (c *conn) auth(database, username, password string) error {
 	}
 	cont := m.(*mysqlx_session.AuthenticateContinue)
 	if len(cont.AuthData) != 20 {
-		panic(len(cont.AuthData))
+		return bugf("expected AuthData to has 20 bytes, got %d", len(cont.AuthData))
 	}
 
 	if err = c.writeMessage(&mysqlx_session.AuthenticateContinue{
@@ -211,13 +211,11 @@ func (c *conn) Close() error {
 }
 
 func (c *conn) Begin() (driver.Tx, error) {
-	bugf("Begin not implemented yet")
-	panic("not reached")
+	return nil, bugf("Begin not implemented yet")
 }
 
 func (c *conn) Prepare(query string) (driver.Stmt, error) {
-	bugf("Prepare not implemented yet")
-	panic("not reached")
+	return nil, bugf("Prepare not implemented yet")
 }
 
 func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
@@ -225,7 +223,11 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 		Stmt: []byte(query),
 	}
 	for _, arg := range args {
-		stmt.Args = append(stmt.Args, marshalValue(arg))
+		a, err := marshalValue(arg)
+		if err != nil {
+			return nil, err
+		}
+		stmt.Args = append(stmt.Args, a)
 	}
 
 	if err := c.writeMessage(stmt); err != nil {
@@ -273,14 +275,14 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 			case mysqlx_notice.SessionStateChanged_ROWS_AFFECTED:
 				continue
 			default:
-				bugf("unhandled session state change %v", m)
+				return nil, bugf("unhandled session state change %v", m)
 			}
 		case *mysqlx_sql.StmtExecuteOk:
 			close(rows.rows)
 			return &rows, nil
 
 		default:
-			bugf("unhandled type %T", m)
+			return nil, bugf("unhandled type %T", m)
 		}
 	}
 }
@@ -290,7 +292,11 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 		Stmt: []byte(query),
 	}
 	for _, arg := range args {
-		stmt.Args = append(stmt.Args, marshalValue(arg))
+		a, err := marshalValue(arg)
+		if err != nil {
+			return nil, err
+		}
+		stmt.Args = append(stmt.Args, a)
 	}
 
 	if err := c.writeMessage(stmt); err != nil {
@@ -343,13 +349,13 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 				// TODO log it?
 				continue
 			default:
-				bugf("unhandled session state change %v", m)
+				return nil, bugf("unhandled session state change %v", m)
 			}
 		case *mysqlx_sql.StmtExecuteOk:
 			return result, nil
 
 		default:
-			bugf("unhandled type %T", m)
+			return nil, bugf("unhandled type %T", m)
 		}
 	}
 }
@@ -376,7 +382,7 @@ func (c *conn) writeMessage(m proto.Message) error {
 		t = mysqlx.ClientMessages_SQL_STMT_EXECUTE
 
 	default:
-		bugf("unhandled client message: %T %#v", m, m)
+		return bugf("unhandled client message: %T %#v", m, m)
 	}
 
 	c.tracef(">>> %T %v", m, m)
@@ -433,7 +439,7 @@ func (c *conn) readMessage() (proto.Message, error) {
 		m = new(mysqlx_sql.StmtExecuteOk)
 
 	default:
-		bugf("unhandled type of server message: %s (%d)", t, t)
+		return nil, bugf("unhandled type of server message: %s (%d)", t, t)
 	}
 
 	b := make([]byte, l-1)
@@ -468,11 +474,11 @@ func (c *conn) readMessage() (proto.Message, error) {
 				return nil, err
 			}
 		default:
-			bugf("unexpected notice frame type: %v", f)
+			return nil, bugf("unexpected notice frame type: %v", f)
 		}
 
 		if f.GetScope() != mysqlx_notice.Frame_LOCAL {
-			bugf("unexpected notice frame scope: %v", f)
+			return nil, bugf("unexpected notice frame scope: %v", f)
 		}
 	}
 

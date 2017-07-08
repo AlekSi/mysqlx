@@ -24,7 +24,7 @@ func unmarshalValue(value []byte, column *mysqlx_resultset.ColumnMetaData) (driv
 		// TINY, SHORT, INT24, INT, LONGLONG
 		i64, n := binary.Varint(value)
 		if n != len(value) {
-			bugf("failed to decode %#v as SINT", value)
+			return nil, bugf("failed to decode %#v as SINT", value)
 		}
 		return i64, nil
 
@@ -32,7 +32,7 @@ func unmarshalValue(value []byte, column *mysqlx_resultset.ColumnMetaData) (driv
 		// TINY UNSIGNED, SHORT UNSIGNED, INT24 UNSIGNED, INT UNSIGNED, LONGLONG UNSIGNED, YEAR
 		u64, n := binary.Uvarint(value)
 		if n != len(value) {
-			bugf("failed to decode %#v as UINT", value)
+			return nil, bugf("failed to decode %#v as UINT", value)
 		}
 		return int64(u64), nil
 
@@ -54,7 +54,7 @@ func unmarshalValue(value []byte, column *mysqlx_resultset.ColumnMetaData) (driv
 		month, _ := binary.ReadUvarint(r)
 		day, err := binary.ReadUvarint(r)
 		if err != nil {
-			bugf("failed to decode %#v as DATETIME: %s", value, err)
+			return nil, bugf("failed to decode %#v as DATETIME: %s", value, err)
 		}
 		hour, _ := binary.ReadUvarint(r)
 		min, _ := binary.ReadUvarint(r)
@@ -63,19 +63,18 @@ func unmarshalValue(value []byte, column *mysqlx_resultset.ColumnMetaData) (driv
 		return time.Date(int(year), time.Month(month), int(day), int(hour), int(min), int(sec), int(usec)*1000, time.UTC), nil
 
 	default:
-		bugf("unhandled type %s", column.Type)
-		panic("not reached")
+		return nil, bugf("unhandled type %s", column.Type)
 	}
 }
 
-func marshalValue(value driver.Value) *mysqlx_datatypes.Any {
+func marshalValue(value driver.Value) (*mysqlx_datatypes.Any, error) {
 	if value == nil {
 		return &mysqlx_datatypes.Any{
 			Type: mysqlx_datatypes.Any_SCALAR.Enum(),
 			Scalar: &mysqlx_datatypes.Scalar{
 				Type: mysqlx_datatypes.Scalar_V_NULL.Enum(),
 			},
-		}
+		}, nil
 	}
 
 	switch value := value.(type) {
@@ -88,7 +87,7 @@ func marshalValue(value driver.Value) *mysqlx_datatypes.Any {
 					Value: []byte(value),
 				},
 			},
-		}
+		}, nil
 
 	case int64:
 		return &mysqlx_datatypes.Any{
@@ -97,7 +96,7 @@ func marshalValue(value driver.Value) *mysqlx_datatypes.Any {
 				Type:       mysqlx_datatypes.Scalar_V_SINT.Enum(),
 				VSignedInt: proto.Int64(value),
 			},
-		}
+		}, nil
 
 	case time.Time:
 		s := value.Format("2006-01-02 15:04:05.999999999")
@@ -109,11 +108,9 @@ func marshalValue(value driver.Value) *mysqlx_datatypes.Any {
 					Value: []byte(s),
 				},
 			},
-		}
+		}, nil
 
 	default:
-		bugf("unhandled type %T", value)
+		return nil, bugf("unhandled type %T", value)
 	}
-
-	panic("not reached")
 }
