@@ -22,7 +22,7 @@ func (r *rows) runReader() {
 	defer close(r.rows)
 
 	for {
-		m, err := readMessage(r.c.transport)
+		m, err := r.c.readMessage()
 		if err != nil {
 			r.readErr = err
 			return

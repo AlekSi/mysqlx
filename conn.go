@@ -5,8 +5,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -21,18 +23,25 @@ import (
 	"github.com/AlekSi/mysqlx/internal/mysqlx_sql"
 )
 
-var debugf = func(format string, v ...interface{}) {}
+type traceFunc func(format string, v ...interface{})
+
+func noTrace(string, ...interface{}) {}
+
+// for tests only
+var globalTraceF = noTrace
 
 type conn struct {
 	transport net.Conn
+	tracef    traceFunc
 
 	closeOnce *sync.Once
 	closeErr  error
 }
 
-func newConn(transport net.Conn) *conn {
+func newConn(transport net.Conn, traceF traceFunc) *conn {
 	return &conn{
 		transport: transport,
+		tracef:    traceF,
 
 		closeOnce: new(sync.Once),
 	}
@@ -44,14 +53,24 @@ func open(dataSource string) (*conn, error) {
 		return nil, err
 	}
 
+	// check and handle parameters, extract session variables
 	params := u.Query()
 	vars := make(map[string]string, len(params))
+	traceF := globalTraceF
 	for k, vs := range params {
 		if len(vs) != 1 {
-			return nil, fmt.Errorf("%d values for parameter %s", len(vs), k)
+			return nil, fmt.Errorf("%d values for parameter %q", len(vs), k)
 		}
 		if !strings.HasPrefix(k, "_") {
 			vars[k] = vs[0]
+			continue
+		}
+
+		switch k {
+		case "_trace":
+			traceF = log.New(os.Stderr, "mysqlx: ", log.Lshortfile).Printf
+		default:
+			return nil, fmt.Errorf("unexpected parameter %q", k)
 		}
 	}
 
@@ -59,7 +78,7 @@ func open(dataSource string) (*conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := newConn(conn)
+	c := newConn(conn, traceF)
 
 	database := strings.TrimPrefix(u.Path, "/")
 	var username, password string
@@ -74,6 +93,7 @@ func open(dataSource string) (*conn, error) {
 		return nil, err
 	}
 
+	// set session variables
 	keys := make([]string, 0, len(vars))
 	for k := range vars {
 		keys = append(keys, k)
@@ -89,10 +109,10 @@ func open(dataSource string) (*conn, error) {
 }
 
 func (c *conn) negotiate() error {
-	if err := writeMessage(c.transport, &mysqlx_connection.CapabilitiesGet{}); err != nil {
+	if err := c.writeMessage(&mysqlx_connection.CapabilitiesGet{}); err != nil {
 		return c.close(err)
 	}
-	m, err := readMessage(c.transport)
+	m, err := c.readMessage()
 	if err != nil {
 		return c.close(err)
 	}
@@ -121,13 +141,13 @@ func (c *conn) auth(database, username, password string) error {
 	// TODO use password
 
 	mechName := "MYSQL41"
-	if err := writeMessage(c.transport, &mysqlx_session.AuthenticateStart{
+	if err := c.writeMessage(&mysqlx_session.AuthenticateStart{
 		MechName: &mechName,
 	}); err != nil {
 		return c.close(err)
 	}
 
-	m, err := readMessage(c.transport)
+	m, err := c.readMessage()
 	if err != nil {
 		return c.close(err)
 	}
@@ -136,19 +156,19 @@ func (c *conn) auth(database, username, password string) error {
 		panic(len(cont.AuthData))
 	}
 
-	if err = writeMessage(c.transport, &mysqlx_session.AuthenticateContinue{
+	if err = c.writeMessage(&mysqlx_session.AuthenticateContinue{
 		AuthData: []byte(database + "\x00" + username + "\x00"),
 	}); err != nil {
 		return c.close(err)
 	}
 
-	m, err = readMessage(c.transport)
+	m, err = c.readMessage()
 	if err != nil {
 		return c.close(err)
 	}
 	_ = m.(*mysqlx_notice.SessionStateChanged)
 
-	m, err = readMessage(c.transport)
+	m, err = c.readMessage()
 	if err != nil {
 		return c.close(err)
 	}
@@ -169,12 +189,12 @@ func (c *conn) close(err error) error {
 }
 
 func (c *conn) Close() error {
-	if err := writeMessage(c.transport, &mysqlx_connection.Close{}); err != nil {
+	if err := c.writeMessage(&mysqlx_connection.Close{}); err != nil {
 		return c.close(err)
 	}
 
 	// read one next message, but do not check it is mysqlx.Ok
-	if _, err := readMessage(c.transport); err != nil {
+	if _, err := c.readMessage(); err != nil {
 		return c.close(err)
 	}
 
@@ -199,7 +219,7 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 		stmt.Args = append(stmt.Args, marshalValue(arg))
 	}
 
-	if err := writeMessage(c.transport, stmt); err != nil {
+	if err := c.writeMessage(stmt); err != nil {
 		return nil, c.close(err)
 	}
 
@@ -209,7 +229,7 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 		rows:    make(chan *mysqlx_resultset.Row, 1),
 	}
 	for {
-		m, err := readMessage(c.transport)
+		m, err := c.readMessage()
 		if err != nil {
 			return nil, c.close(err)
 		}
@@ -261,13 +281,13 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 		stmt.Args = append(stmt.Args, marshalValue(arg))
 	}
 
-	if err := writeMessage(c.transport, stmt); err != nil {
+	if err := c.writeMessage(stmt); err != nil {
 		return nil, c.close(err)
 	}
 
 	var result driver.Result = driver.ResultNoRows
 	for {
-		m, err := readMessage(c.transport)
+		m, err := c.readMessage()
 		if err != nil {
 			return nil, c.close(err)
 		}
@@ -321,7 +341,7 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 	}
 }
 
-func writeMessage(w io.Writer, m proto.Message) error {
+func (c *conn) writeMessage(m proto.Message) error {
 	b, err := proto.Marshal(m)
 	if err != nil {
 		return err
@@ -346,18 +366,18 @@ func writeMessage(w io.Writer, m proto.Message) error {
 		bugf("unhandled client message: %T %#v", m, m)
 	}
 
-	debugf(">>> %T %v", m, m)
+	c.tracef(">>> %T %v", m, m)
 
 	var head [5]byte
 	binary.LittleEndian.PutUint32(head[:], uint32(len(b))+1)
 	head[4] = byte(t)
-	_, err = (&net.Buffers{head[:], b}).WriteTo(w)
+	_, err = (&net.Buffers{head[:], b}).WriteTo(c.transport)
 	return err
 }
 
-func readMessage(r io.Reader) (proto.Message, error) {
+func (c *conn) readMessage() (proto.Message, error) {
 	var head [5]byte
-	if _, err := io.ReadFull(r, head[:]); err != nil {
+	if _, err := io.ReadFull(c.transport, head[:]); err != nil {
 		return nil, err
 	}
 	l := binary.LittleEndian.Uint32(head[:])
@@ -404,7 +424,7 @@ func readMessage(r io.Reader) (proto.Message, error) {
 	}
 
 	b := make([]byte, l-1)
-	if _, err := io.ReadFull(r, b); err != nil {
+	if _, err := io.ReadFull(c.transport, b); err != nil {
 		return nil, err
 	}
 	if err := proto.Unmarshal(b, m); err != nil {
@@ -422,8 +442,8 @@ func readMessage(r io.Reader) (proto.Message, error) {
 			}
 
 			// TODO expose warnings?
-			debugf("<-- %T %v: %T %v", f, f, m, m)
-			return readMessage(r)
+			c.tracef("<-- %T %v: %T %v", f, f, m, m)
+			return c.readMessage()
 		case 2:
 			m = new(mysqlx_notice.SessionVariableChanged)
 			if err := proto.Unmarshal(f.Payload, m); err != nil {
@@ -443,7 +463,7 @@ func readMessage(r io.Reader) (proto.Message, error) {
 		}
 	}
 
-	debugf("<<< %T %v", m, m)
+	c.tracef("<<< %T %v", m, m)
 	return m, nil
 }
 

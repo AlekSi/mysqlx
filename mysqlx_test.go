@@ -54,7 +54,7 @@ func TestMySQLX(t *testing.T) {
 }
 
 func (s *MySQLXSuite) SetupTest() {
-	debugf = s.T().Logf
+	globalTraceF = s.T().Logf
 
 	var err error
 	s.db, err = sql.Open("mysqlx", "tcp://root:@127.0.0.1:33060/world_x")
@@ -244,7 +244,7 @@ func (s *MySQLXSuite) TestExecQuery() {
 }
 
 func TestNoDatabase(t *testing.T) {
-	debugf = t.Logf
+	globalTraceF = t.Logf
 
 	db, err := sql.Open("mysqlx", "tcp://root:@127.0.0.1:33060/?sql_mode=ANSI")
 	require.NoError(t, err)
