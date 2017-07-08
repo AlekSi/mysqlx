@@ -163,7 +163,7 @@ func (c *conn) auth(database, username, password string) error {
 	}
 	cont := m.(*mysqlx_session.AuthenticateContinue)
 	if len(cont.AuthData) != 20 {
-		return bugf("expected AuthData to has 20 bytes, got %d", len(cont.AuthData))
+		return bugf("auth: expected AuthData to has 20 bytes, got %d", len(cont.AuthData))
 	}
 
 	if err = c.writeMessage(&mysqlx_session.AuthenticateContinue{
@@ -279,14 +279,14 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 			case mysqlx_notice.SessionStateChanged_ROWS_AFFECTED:
 				continue
 			default:
-				return nil, bugf("unhandled session state change %v", m)
+				return nil, bugf("Query; unhandled session state change %v", m)
 			}
 		case *mysqlx_sql.StmtExecuteOk:
 			close(rows.rows)
 			return &rows, nil
 
 		default:
-			return nil, bugf("unhandled type %T", m)
+			return nil, bugf("Query: unhandled type %T", m)
 		}
 	}
 }
@@ -353,13 +353,13 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 				// TODO log it?
 				continue
 			default:
-				return nil, bugf("unhandled session state change %v", m)
+				return nil, bugf("Exec: unhandled session state change %v", m)
 			}
 		case *mysqlx_sql.StmtExecuteOk:
 			return result, nil
 
 		default:
-			return nil, bugf("unhandled type %T", m)
+			return nil, bugf("Exec: unhandled type %T", m)
 		}
 	}
 }
@@ -394,7 +394,7 @@ func (c *conn) writeMessage(m proto.Message) error {
 		t = mysqlx.ClientMessages_SQL_STMT_EXECUTE
 
 	default:
-		return bugf("unhandled client message: %T %#v", m, m)
+		return bugf("writeMessage: unhandled client message: %T %#v", m, m)
 	}
 
 	c.tracef(">>> %T %v", m, m)
@@ -451,7 +451,7 @@ func (c *conn) readMessage() (proto.Message, error) {
 		m = new(mysqlx_sql.StmtExecuteOk)
 
 	default:
-		return nil, bugf("unhandled type of server message: %s (%d)", t, t)
+		return nil, bugf("readMessage: unhandled type of server message: %s (%d)", t, t)
 	}
 
 	b := make([]byte, l-1)
@@ -486,11 +486,11 @@ func (c *conn) readMessage() (proto.Message, error) {
 				return nil, err
 			}
 		default:
-			return nil, bugf("unexpected notice frame type: %v", f)
+			return nil, bugf("readMessage: unexpected notice frame type: %v", f)
 		}
 
 		if f.GetScope() != mysqlx_notice.Frame_LOCAL {
-			return nil, bugf("unexpected notice frame scope: %v", f)
+			return nil, bugf("readMessage: unexpected notice frame scope: %v", f)
 		}
 	}
 

@@ -38,13 +38,13 @@ func (r *rows) runReader() {
 			case mysqlx_notice.SessionStateChanged_ROWS_AFFECTED:
 				continue
 			default:
-				r.readErr = bugf("unhandled session state change %v", m)
+				r.readErr = bugf("runReader: unhandled session state change %v", m)
 				return
 			}
 		case *mysqlx_sql.StmtExecuteOk:
 			return
 		default:
-			r.readErr = bugf("unhandled message %T", m)
+			r.readErr = bugf("runReader: unhandled message %T", m)
 			return
 		}
 	}

@@ -13,8 +13,13 @@ Please wait for it.
 * https://dev.mysql.com/doc/dev/mysql-server/latest/PAGE_PROTOCOL.html
 
 ## TODO
+* Float, double, decimal.
+* Binary strings.
 * Correct connection closing.
 * Concurrent tests.
 * Connection string format.
+* TLS.
 * Add support for https://github.com/gogo/protobuf
-* MUCH MORE
+* Charsets.
+* Time zones.
+* MUCH MORE.
