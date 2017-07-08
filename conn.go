@@ -1,6 +1,7 @@
 package mysqlx
 
 import (
+	"context"
 	"database/sql/driver"
 	"encoding/binary"
 	"fmt"
@@ -171,14 +172,12 @@ func (c *conn) auth(database, username, password string) error {
 		return c.close(err)
 	}
 
-	m, err = c.readMessage()
-	if err != nil {
+	if m, err = c.readMessage(); err != nil {
 		return c.close(err)
 	}
 	_ = m.(*mysqlx_notice.SessionStateChanged)
 
-	m, err = c.readMessage()
-	if err != nil {
+	if m, err = c.readMessage(); err != nil {
 		return c.close(err)
 	}
 	_ = m.(*mysqlx_session.AuthenticateOk)
@@ -365,6 +364,14 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 	}
 }
 
+func (c *conn) Ping(ctx context.Context) error {
+	// TODO use context
+	if _, err := c.Exec("SELECT 'ping'", nil); err != nil {
+		return driver.ErrBadConn
+	}
+	return nil
+}
+
 func (c *conn) writeMessage(m proto.Message) error {
 	b, err := proto.Marshal(m)
 	if err != nil {
@@ -496,12 +503,12 @@ var (
 	_ driver.Conn    = (*conn)(nil)
 	_ driver.Queryer = (*conn)(nil)
 	_ driver.Execer  = (*conn)(nil)
+	_ driver.Pinger  = (*conn)(nil)
 
 	// TODO
 	// _ driver.ConnBeginTx        = (*conn)(nil)
 	// _ driver.ConnPrepareContext = (*conn)(nil)
 	// _ driver.ExecerContext      = (*conn)(nil)
 	// _ driver.NamedValueChecker  = (*conn)(nil)
-	// _ driver.Pinger             = (*conn)(nil)
 	// _ driver.QueryerContext     = (*conn)(nil)
 )
