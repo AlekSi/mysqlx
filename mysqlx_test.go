@@ -186,6 +186,15 @@ func (s *MySQLXSuite) TestQueryData() {
 	}
 }
 
+func (s *MySQLXSuite) TestQueryEmpty() {
+	_, err := s.db.Exec("CREATE TEMPORARY TABLE TestQueryEmpty (id int AUTO_INCREMENT, PRIMARY KEY (id))")
+	s.Require().NoError(err)
+
+	var actual interface{} = "NOT SET"
+	s.Equal(sql.ErrNoRows, s.db.QueryRow("SELECT * FROM TestQueryEmpty").Scan(&actual))
+	s.Equal("NOT SET", actual)
+}
+
 func (s *MySQLXSuite) TestQueryExec() {
 	// test QueryRow
 	var actual interface{} = "NOT SET"

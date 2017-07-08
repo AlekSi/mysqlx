@@ -256,15 +256,18 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 				Msg:      m.GetMsg(),
 			}
 
-		// query with rows
 		case *mysqlx_resultset.ColumnMetaData:
 			rows.columns = append(rows.columns, *m)
+
+		// query with rows
 		case *mysqlx_resultset.Row:
 			rows.rows <- m
 			go rows.runReader()
 			return &rows, nil
 
 		// query without rows
+		case *mysqlx_resultset.FetchDone:
+			continue
 		case *mysqlx_notice.SessionStateChanged:
 			switch m.GetParam() {
 			case mysqlx_notice.SessionStateChanged_ROWS_AFFECTED:
@@ -314,15 +317,16 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 				Msg:      m.GetMsg(),
 			}
 
-		// query with rows
 		case *mysqlx_resultset.ColumnMetaData:
 			continue
+
+		// query with rows
 		case *mysqlx_resultset.Row:
-			continue
-		case *mysqlx_resultset.FetchDone:
 			continue
 
 		// query without rows
+		case *mysqlx_resultset.FetchDone:
+			continue
 		case *mysqlx_notice.SessionStateChanged:
 			switch m.GetParam() {
 			case mysqlx_notice.SessionStateChanged_GENERATED_INSERT_ID:
