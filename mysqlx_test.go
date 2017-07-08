@@ -246,7 +246,7 @@ func (s *MySQLXSuite) TestExecQuery() {
 func TestNoDatabase(t *testing.T) {
 	debugf = t.Logf
 
-	db, err := sql.Open("mysqlx", "tcp://root:@127.0.0.1:33060/")
+	db, err := sql.Open("mysqlx", "tcp://root:@127.0.0.1:33060/?sql_mode=ANSI")
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, db.Close())

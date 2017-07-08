@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 
@@ -43,6 +44,17 @@ func open(dataSource string) (*conn, error) {
 		return nil, err
 	}
 
+	params := u.Query()
+	vars := make(map[string]string, len(params))
+	for k, vs := range params {
+		if len(vs) != 1 {
+			return nil, fmt.Errorf("%d values for parameter %s", len(vs), k)
+		}
+		if !strings.HasPrefix(k, "_") {
+			vars[k] = vs[0]
+		}
+	}
+
 	conn, err := net.Dial(u.Scheme, u.Host)
 	if err != nil {
 		return nil, err
@@ -61,6 +73,18 @@ func open(dataSource string) (*conn, error) {
 	if err = c.auth(database, username, password); err != nil {
 		return nil, err
 	}
+
+	keys := make([]string, 0, len(vars))
+	for k := range vars {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if _, err = c.Exec("SET SESSION "+k+" = ?", []driver.Value{vars[k]}); err != nil {
+			return nil, err
+		}
+	}
+
 	return c, nil
 }
 
