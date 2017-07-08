@@ -252,6 +252,44 @@ func (s *MySQLXSuite) TestExecQuery() {
 	s.Equal(int64(0), ra)
 }
 
+func (s *MySQLXSuite) TestBeginCommit() {
+	_, err := s.db.Exec("CREATE TEMPORARY TABLE TestBeginRollback (id int AUTO_INCREMENT, PRIMARY KEY (id))")
+	s.Require().NoError(err)
+
+	tx, err := s.db.Begin()
+	s.Require().NoError(err)
+
+	_, err = tx.Exec("INSERT INTO TestBeginRollback VALUES (1)")
+	s.NoError(err)
+
+	s.NoError(tx.Commit())
+	s.Equal(sql.ErrTxDone, tx.Commit())
+	s.Equal(sql.ErrTxDone, tx.Rollback())
+
+	var count int
+	s.NoError(s.db.QueryRow("SELECT COUNT(*) FROM TestBeginRollback").Scan(&count))
+	s.Equal(1, count)
+}
+
+func (s *MySQLXSuite) TestBeginRollback() {
+	_, err := s.db.Exec("CREATE TEMPORARY TABLE TestBeginRollback (id int AUTO_INCREMENT, PRIMARY KEY (id))")
+	s.Require().NoError(err)
+
+	tx, err := s.db.Begin()
+	s.Require().NoError(err)
+
+	_, err = tx.Exec("INSERT INTO TestBeginRollback VALUES (1)")
+	s.NoError(err)
+
+	s.NoError(tx.Rollback())
+	s.Equal(sql.ErrTxDone, tx.Rollback())
+	s.Equal(sql.ErrTxDone, tx.Commit())
+
+	var count int
+	s.NoError(s.db.QueryRow("SELECT COUNT(*) FROM TestBeginRollback").Scan(&count))
+	s.Equal(0, count)
+}
+
 func TestNoDatabase(t *testing.T) {
 	globalTraceF = t.Logf
 

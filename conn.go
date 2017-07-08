@@ -211,7 +211,12 @@ func (c *conn) Close() error {
 }
 
 func (c *conn) Begin() (driver.Tx, error) {
-	return nil, bugf("Begin not implemented yet")
+	if _, err := c.Exec("BEGIN", nil); err != nil {
+		return nil, err
+	}
+	return &tx{
+		c: c,
+	}, nil
 }
 
 func (c *conn) Prepare(query string) (driver.Stmt, error) {
