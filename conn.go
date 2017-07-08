@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -61,14 +62,22 @@ func open(dataSource string) (*conn, error) {
 		if len(vs) != 1 {
 			return nil, fmt.Errorf("%d values for parameter %q", len(vs), k)
 		}
+		v := vs[0]
+
 		if !strings.HasPrefix(k, "_") {
-			vars[k] = vs[0]
+			vars[k] = v
 			continue
 		}
 
 		switch k {
 		case "_trace":
-			traceF = log.New(os.Stderr, "mysqlx: ", log.Lshortfile).Printf
+			t, err := strconv.ParseBool(v)
+			if err != nil {
+				return nil, fmt.Errorf("failed to handle parameter %q: %s", k, err)
+			}
+			if t {
+				traceF = log.New(os.Stderr, "mysqlx: ", log.Lshortfile).Printf
+			}
 		default:
 			return nil, fmt.Errorf("unexpected parameter %q", k)
 		}
