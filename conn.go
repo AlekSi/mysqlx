@@ -202,12 +202,27 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 				SQLState: m.GetSqlState(),
 				Msg:      m.GetMsg(),
 			}
+
+		// query with rows
 		case *mysqlx_resultset.ColumnMetaData:
 			rows.columns = append(rows.columns, *m)
 		case *mysqlx_resultset.Row:
 			rows.rows <- m
 			go rows.runReader()
 			return &rows, nil
+
+		// query without rows
+		case *mysqlx_notice.SessionStateChanged:
+			switch m.GetParam() {
+			case mysqlx_notice.SessionStateChanged_ROWS_AFFECTED:
+				continue
+			default:
+				bugf("unhandled session state change %v", m)
+			}
+		case *mysqlx_sql.StmtExecuteOk:
+			close(rows.rows)
+			return &rows, nil
+
 		default:
 			bugf("unhandled type %T", m)
 		}

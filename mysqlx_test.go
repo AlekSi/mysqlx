@@ -190,6 +190,23 @@ func (s *MySQLXSuite) TestQueryData() {
 	}
 }
 
+func (s *MySQLXSuite) TestQueryExec() {
+	// test QueryRow
+	var actual interface{} = "NOT SET"
+	s.Equal(sql.ErrNoRows, s.db.QueryRow(`CREATE TEMPORARY TABLE TestQueryExec1 (id int)`).Scan(&actual))
+	s.Equal("NOT SET", actual)
+
+	// test Query, read all rows
+	rows, err := s.db.Query(`CREATE TEMPORARY TABLE TestQueryExec2 (id int)`)
+	s.Require().NoError(err)
+	types, err := rows.ColumnTypes()
+	s.NoError(err)
+	s.Len(types, 0)
+	s.False(rows.Next())
+	s.NoError(rows.Err())
+	s.NoError(rows.Close())
+}
+
 func TestNoDatabase(t *testing.T) {
 	debugf = t.Logf
 
