@@ -13,6 +13,9 @@ env:
 services:
   - docker
 
+before_install:
+  - sudo /etc/init.d/mysql stop
+
 before_script:
   - docker --version
   - docker-compose --version
