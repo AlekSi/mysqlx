@@ -6,6 +6,8 @@ go:
   - 1.8.x
   - tip
 
+go_import_path: github.com/AlekSi/mysqlx
+
 env:
   - MYSQL_IMAGE=mysql/mysql-server:5.7
   - MYSQL_IMAGE=mysql/mysql-server:8.0
@@ -13,12 +15,19 @@ env:
 services:
   - docker
 
+before_install:
+  - sudo /etc/init.d/mysql stop
+
+install:
+  - go get -v -t
+
 before_script:
   - docker --version
   - docker-compose --version
   - docker-compose up -d
 
 script:
+  - sleep 10
   - make init
   - make seed
   - make cover
