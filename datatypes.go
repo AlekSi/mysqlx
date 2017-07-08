@@ -59,7 +59,7 @@ func unmarshalValue(value []byte, column *mysqlx_resultset.ColumnMetaData) (driv
 		hour, _ := binary.ReadUvarint(r)
 		min, _ := binary.ReadUvarint(r)
 		sec, _ := binary.ReadUvarint(r)
-		usec, err := binary.ReadUvarint(r)
+		usec, _ := binary.ReadUvarint(r)
 		return time.Date(int(year), time.Month(month), int(day), int(hour), int(min), int(sec), int(usec)*1000, time.UTC), nil
 
 	default:
