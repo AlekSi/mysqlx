@@ -1,0 +1,27 @@
+dist: trusty
+sudo: required
+language: go
+
+go:
+  - 1.8.x
+  - tip
+
+env:
+  - MYSQL_IMAGE=mysql/mysql-server:5.7
+  - MYSQL_IMAGE=mysql/mysql-server:8.0
+
+services:
+  - docker
+
+before_script:
+  - docker --version
+  - docker-compose --version
+  - docker-compose up -d
+
+script:
+  - make init
+  - make seed
+  - make cover
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
