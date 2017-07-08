@@ -8,7 +8,7 @@ test:
 	go install -v
 	go install -v -race
 	go vet .
-	go test -v -race
+	go test -race
 	go test -v -coverprofile=coverage.txt
 
 cover: test
