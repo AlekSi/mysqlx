@@ -27,6 +27,7 @@ before_script:
   - docker-compose up -d
 
 script:
+  - sleep 10
   - make init
   - make seed
   - make cover
