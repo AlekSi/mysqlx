@@ -56,7 +56,7 @@ func TestMySQLX(t *testing.T) {
 }
 
 func (s *MySQLXSuite) SetupTest() {
-	globalTraceF = s.T().Logf
+	testTraceF = s.T().Logf
 
 	ds := os.Getenv("MYSQLX_TEST_DATASOURCE")
 	s.Require().NotEmpty(ds, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
@@ -298,7 +298,7 @@ func (s *MySQLXSuite) TestBeginRollback() {
 }
 
 func TestNoDatabase(t *testing.T) {
-	globalTraceF = t.Logf
+	testTraceF = t.Logf
 
 	ds := os.Getenv("MYSQLX_TEST_DATASOURCE")
 	require.NotEmpty(t, ds, "Please set environment variable MYSQLX_TEST_DATASOURCE.")

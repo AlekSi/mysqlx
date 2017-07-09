@@ -30,7 +30,7 @@ type traceFunc func(format string, v ...interface{})
 func noTrace(string, ...interface{}) {}
 
 // for tests only
-var globalTraceF = noTrace
+var testTraceF traceFunc
 
 type conn struct {
 	transport net.Conn
@@ -58,7 +58,7 @@ func open(dataSource string) (*conn, error) {
 	// check and handle parameters, extract session variables
 	params := u.Query()
 	vars := make(map[string]string, len(params))
-	traceF := globalTraceF
+	traceF := noTrace
 	for k, vs := range params {
 		if len(vs) != 1 {
 			return nil, fmt.Errorf("%d values for parameter %q", len(vs), k)
@@ -82,6 +82,10 @@ func open(dataSource string) (*conn, error) {
 		default:
 			return nil, fmt.Errorf("unexpected parameter %q", k)
 		}
+	}
+
+	if testTraceF != nil {
+		traceF = testTraceF
 	}
 
 	conn, err := net.Dial(u.Scheme, u.Host)
