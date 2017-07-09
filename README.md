@@ -2,6 +2,7 @@
 
 [![GoDoc](https://godoc.org/github.com/AlekSi/mysqlx?status.svg)](https://godoc.org/github.com/AlekSi/mysqlx)
 [![Build Status](https://travis-ci.org/AlekSi/mysqlx.svg?branch=master)](https://travis-ci.org/AlekSi/mysqlx)
+[![Codecov](https://codecov.io/gh/AlekSi/mysqlx/branch/master/graph/badge.svg)](https://codecov.io/gh/AlekSi/mysqlx)
 [![Go Report Card](https://goreportcard.com/badge/github.com/AlekSi/mysqlx)](https://goreportcard.com/report/github.com/AlekSi/mysqlx)
 
 **Highly experimental work in progress, do not use.**
