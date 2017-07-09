@@ -9,8 +9,11 @@ go:
 go_import_path: github.com/AlekSi/mysqlx
 
 env:
-  - MYSQL_IMAGE=mysql/mysql-server:5.7
-  - MYSQL_IMAGE=mysql/mysql-server:8.0
+  global:
+    - MYSQLX_TEST_DATASOURCE=tcp://root:@127.0.0.1:33060/
+  matrix:
+    - MYSQL_IMAGE=mysql/mysql-server:5.7
+    - MYSQL_IMAGE=mysql/mysql-server:8.0
 
 services:
   - docker
@@ -27,8 +30,8 @@ before_script:
   - docker-compose up -d
 
 script:
-  - sleep 10
-  - make init
+  - make build
+  - go run -v internal/wait.go
   - make seed
   - make cover
 

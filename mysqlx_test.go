@@ -3,6 +3,8 @@ package mysqlx
 import (
 	"database/sql"
 	"math"
+	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -56,8 +58,13 @@ func TestMySQLX(t *testing.T) {
 func (s *MySQLXSuite) SetupTest() {
 	globalTraceF = s.T().Logf
 
-	var err error
-	s.db, err = sql.Open("mysqlx", "tcp://root:@127.0.0.1:33060/world_x")
+	ds := os.Getenv("MYSQLX_TEST_DATASOURCE")
+	s.Require().NotEmpty(ds, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
+	u, err := url.Parse(ds)
+	s.Require().NoError(err)
+	u.Path = "world_x"
+
+	s.db, err = sql.Open("mysqlx", u.String())
 	s.Require().NoError(err)
 	s.Require().NoError(s.db.Ping())
 }
@@ -293,7 +300,12 @@ func (s *MySQLXSuite) TestBeginRollback() {
 func TestNoDatabase(t *testing.T) {
 	globalTraceF = t.Logf
 
-	db, err := sql.Open("mysqlx", "tcp://root:@127.0.0.1:33060/?sql_mode=ANSI")
+	ds := os.Getenv("MYSQLX_TEST_DATASOURCE")
+	require.NotEmpty(t, ds, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
+	u, err := url.Parse(ds)
+	require.NoError(t, err)
+
+	db, err := sql.Open("mysqlx", u.String())
 	require.NoError(t, err)
 	defer func() {
 		assert.NoError(t, db.Close())

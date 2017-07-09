@@ -1,13 +1,15 @@
 all: test
 
-init:
+export MYSQLX_TEST_DATASOURCE ?= tcp://root:@127.0.0.1:33060/
+
+build:
 	go test -v -i
 	go test -v -i -race
-
-test:
 	go install -v
 	go install -v -race
 	go vet .
+
+test: build
 	go test -race
 	go test -v -coverprofile=coverage.txt
 
