@@ -1,6 +1,6 @@
 all: test
 
-export MYSQLX_TEST_DATASOURCE ?= tcp://root:@127.0.0.1:33060/
+export MYSQLX_TEST_DATASOURCE ?= tcp://root:@127.0.0.1:33060/?_trace=1&time_zone=UTC
 
 build:
 	go test -v -i
