@@ -18,6 +18,7 @@ Please wait for it.
 * Binary strings.
 * Correct connection closing.
 * Concurrent tests.
+* Benchmarks.
 * Connection string format.
 * TLS.
 * Add support for https://github.com/gogo/protobuf
