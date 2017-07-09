@@ -32,6 +32,13 @@ func noTrace(string, ...interface{}) {}
 // for tests only
 var testTraceF traceFunc
 
+// TODO make this configurable?
+// It should not be less then 1.
+const rowsCap = 1
+
+// conn is a connection to a database.
+// It is not used concurrently by multiple goroutines.
+// conn is assumed to be stateful.
 type conn struct {
 	transport net.Conn
 	tracef    traceFunc
@@ -41,6 +48,8 @@ type conn struct {
 }
 
 func newConn(transport net.Conn, traceF traceFunc) *conn {
+	traceF("+++ connection created: %s->%s", transport.LocalAddr(), transport.RemoteAddr())
+
 	return &conn{
 		transport: transport,
 		tracef:    traceF,
@@ -168,7 +177,7 @@ func (c *conn) auth(database, username, password string) error {
 	}
 	cont := m.(*mysqlx_session.AuthenticateContinue)
 	if len(cont.AuthData) != 20 {
-		return bugf("auth: expected AuthData to has 20 bytes, got %d", len(cont.AuthData))
+		return bugf("conn.auth: expected AuthData to has 20 bytes, got %d", len(cont.AuthData))
 	}
 
 	if err = c.writeMessage(&mysqlx_session.AuthenticateContinue{
@@ -198,9 +207,15 @@ func (c *conn) close(err error) error {
 			c.closeErr = e
 		}
 	})
+
+	c.tracef("--- connection closed: %s->%s", c.transport.LocalAddr(), c.transport.RemoteAddr())
 	return c.closeErr
 }
 
+// Close invalidates and potentially stops any current prepared statements and transactions,
+// marking this connection as no longer in use.
+// Because the sql package maintains a free pool of connections and only calls Close when there's
+// a surplus of idle connections, it shouldn't be necessary for drivers to do their own connection caching.
 func (c *conn) Close() error {
 	if err := c.writeMessage(&mysqlx_connection.Close{}); err != nil {
 		return c.close(err)
@@ -214,6 +229,7 @@ func (c *conn) Close() error {
 	return c.close(nil)
 }
 
+// Begin starts and returns a new transaction.
 func (c *conn) Begin() (driver.Tx, error) {
 	if _, err := c.Exec("BEGIN", nil); err != nil {
 		return nil, err
@@ -223,8 +239,9 @@ func (c *conn) Begin() (driver.Tx, error) {
 	}, nil
 }
 
+// Prepare returns a prepared statement, bound to this connection.
 func (c *conn) Prepare(query string) (driver.Stmt, error) {
-	return nil, bugf("Prepare not implemented yet")
+	return nil, bugf("conn.Prepare not implemented yet")
 }
 
 func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
@@ -246,7 +263,7 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 	rows := rows{
 		c:       c,
 		columns: make([]mysqlx_resultset.ColumnMetaData, 0, 1),
-		rows:    make(chan *mysqlx_resultset.Row, 1),
+		rows:    make(chan *mysqlx_resultset.Row, rowsCap),
 	}
 	for {
 		m, err := c.readMessage()
@@ -284,14 +301,14 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 			case mysqlx_notice.SessionStateChanged_ROWS_AFFECTED:
 				continue
 			default:
-				return nil, bugf("Query; unhandled session state change %v", m)
+				return nil, bugf("conn.Query: unhandled session state change %v", m)
 			}
 		case *mysqlx_sql.StmtExecuteOk:
 			close(rows.rows)
 			return &rows, nil
 
 		default:
-			return nil, bugf("Query: unhandled type %T", m)
+			return nil, bugf("conn.Query: unhandled type %T", m)
 		}
 	}
 }
@@ -358,13 +375,13 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 				// TODO log it?
 				continue
 			default:
-				return nil, bugf("Exec: unhandled session state change %v", m)
+				return nil, bugf("conn.Exec: unhandled session state change %v", m)
 			}
 		case *mysqlx_sql.StmtExecuteOk:
 			return result, nil
 
 		default:
-			return nil, bugf("Exec: unhandled type %T", m)
+			return nil, bugf("conn.Exec: unhandled type %T", m)
 		}
 	}
 }
@@ -399,7 +416,7 @@ func (c *conn) writeMessage(m proto.Message) error {
 		t = mysqlx.ClientMessages_SQL_STMT_EXECUTE
 
 	default:
-		return bugf("writeMessage: unhandled client message: %T %#v", m, m)
+		return bugf("conn.writeMessage: unhandled client message: %T %#v", m, m)
 	}
 
 	c.tracef(">>> %T %v", m, m)
@@ -456,7 +473,7 @@ func (c *conn) readMessage() (proto.Message, error) {
 		m = new(mysqlx_sql.StmtExecuteOk)
 
 	default:
-		return nil, bugf("readMessage: unhandled type of server message: %s (%d)", t, t)
+		return nil, bugf("conn.readMessage: unhandled type of server message: %s (%d)", t, t)
 	}
 
 	b := make([]byte, l-1)
@@ -478,7 +495,7 @@ func (c *conn) readMessage() (proto.Message, error) {
 			}
 
 			// TODO expose warnings?
-			c.tracef("<-- %T %v: %T %v", f, f, m, m)
+			c.tracef("<== %T %v: %T %v", f, f, m, m)
 			return c.readMessage()
 		case 2:
 			m = new(mysqlx_notice.SessionVariableChanged)
@@ -491,11 +508,11 @@ func (c *conn) readMessage() (proto.Message, error) {
 				return nil, err
 			}
 		default:
-			return nil, bugf("readMessage: unexpected notice frame type: %v", f)
+			return nil, bugf("conn.readMessage: unexpected notice frame type: %v", f)
 		}
 
 		if f.GetScope() != mysqlx_notice.Frame_LOCAL {
-			return nil, bugf("readMessage: unexpected notice frame scope: %v", f)
+			return nil, bugf("conn.readMessage: unexpected notice frame scope: %v", f)
 		}
 	}
 
