@@ -219,6 +219,33 @@ func (s *MySQLXSuite) TestQueryExec() {
 	s.NoError(rows.Close())
 }
 
+func (s *MySQLXSuite) TestQueryCloseEarly() {
+	// read 0 rows
+	rows, err := s.db.Query("SELECT ID, Name, District, Info FROM city WHERE CountryCode = ? ORDER BY ID LIMIT 3", "RUS")
+	s.Require().NoError(err)
+	s.NoError(rows.Close())
+
+	// read 1 row
+	var city City
+	rows, err = s.db.Query("SELECT ID, Name, District, Info FROM city WHERE CountryCode = ? ORDER BY ID LIMIT 3", "USA")
+	s.Require().NoError(err)
+	s.True(rows.Next())
+	s.NoError(rows.Scan(city.Pointers()...))
+	s.Equal(City{3793, "New York", "New York", `{"Population": 8008278}`}, city)
+	s.NoError(rows.Close())
+
+	// read 2 rows
+	rows, err = s.db.Query("SELECT ID, Name, District, Info FROM city WHERE CountryCode = ? ORDER BY ID LIMIT 3", "FRA")
+	s.Require().NoError(err)
+	s.True(rows.Next())
+	s.NoError(rows.Scan(city.Pointers()...))
+	s.Equal(City{2974, "Paris", "Île-de-France", `{"Population": 2125246}`}, city)
+	s.True(rows.Next())
+	s.NoError(rows.Scan(city.Pointers()...))
+	s.Equal(City{2975, "Marseille", "Provence-Alpes-Côte", `{"Population": 798430}`}, city)
+	s.NoError(rows.Close())
+}
+
 func (s *MySQLXSuite) TestExec() {
 	res, err := s.db.Exec("CREATE TEMPORARY TABLE TestExec (id int AUTO_INCREMENT, PRIMARY KEY (id))")
 	s.Require().NoError(err)

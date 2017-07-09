@@ -10,7 +10,7 @@ import (
 	"github.com/AlekSi/mysqlx/internal/mysqlx_sql"
 )
 
-// FIXME should it be thread-safe?
+// rows is an iterator over an executed query's results.
 type rows struct {
 	c       *conn
 	columns []mysqlx_resultset.ColumnMetaData
@@ -18,6 +18,7 @@ type rows struct {
 	readErr error
 }
 
+// runReader reads rows and sends then to channel until all rows are read or error is encountered.
 func (r *rows) runReader() {
 	defer close(r.rows)
 
@@ -50,6 +51,9 @@ func (r *rows) runReader() {
 	}
 }
 
+// Columns returns the names of the columns.
+// The number of columns of the result is inferred from the length of the slice.
+// If a particular column name isn't known, an empty string should be returned for that entry.
 func (r *rows) Columns() []string {
 	res := make([]string, len(r.columns))
 	for i, c := range r.columns {
@@ -58,10 +62,54 @@ func (r *rows) Columns() []string {
 	return res
 }
 
+// Close closes the rows iterator.
+func (r *rows) Close() error {
+	// TODO limit a number of messages to drain there? and close connection?
+
+	// drain messages until r.rows is closed in runReader
+	for range r.rows {
+	}
+
+	// FIXME should we return r.readErr instead of nil?
+	return nil
+}
+
+// Next is called to populate the next row of data into the provided slice.
+// The provided slice will be the same size as the Columns() are wide.
+// Next should return io.EOF when there are no more rows.
+func (r *rows) Next(dest []driver.Value) error {
+	row, ok := <-r.rows
+	if !ok {
+		if r.readErr != nil {
+			return r.readErr
+		}
+		return io.EOF
+	}
+
+	// unmarshal all values, return first encountered error
+	var err error
+	for i, value := range row.Field {
+		d, e := unmarshalValue(value, &r.columns[i])
+		dest[i] = d
+		if err == nil {
+			err = e
+		}
+	}
+	return err
+}
+
+// RowsColumnTypeDatabaseTypeName returns the database system type name without the length.
+// Type names should be uppercase. Returned types:
+// SINT, UINT, DOUBLE, FLOAT, BYTES, TIME, DATETIME, SET, ENUM, BIT, DECIMAL.
 func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	return r.columns[index].Type.String()
 }
 
+// RowsColumnTypeLength return the length of the column type if the column is a variable length type.
+// If the column is not a variable length type ok should return false.
+// If length is not limited other than system limits, it should return math.MaxInt64.
+// The following are examples of returned values for various types:
+// TODO add examples
 func (r *rows) ColumnTypeLength(index int) (length int64, ok bool) {
 	c := r.columns[index]
 	length = int64(c.GetLength())
@@ -72,37 +120,13 @@ func (r *rows) ColumnTypeLength(index int) (length int64, ok bool) {
 	return
 }
 
+// RowsColumnTypeNullable returns true if it is known the column may be null,
+// or false if the column is known to be not nullable.
+// If the column nullability is unknown, ok should be false.
 func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
-	nullable = (*r.columns[index].Flags & 0x0010) != 0
+	nullable = (r.columns[index].GetFlags() & 0x0010) != 0
 	ok = true
 	return
-}
-
-func (r *rows) Close() error {
-	// drain messages
-	for range r.rows {
-	}
-	return nil
-}
-
-func (r *rows) Next(dest []driver.Value) error {
-	row, ok := <-r.rows
-	if !ok {
-		if r.readErr != nil {
-			return r.readErr
-		}
-		return io.EOF
-	}
-
-	var err error
-	for i, value := range row.Field {
-		d, e := unmarshalValue(value, &r.columns[i])
-		dest[i] = d
-		if e != nil {
-			err = e
-		}
-	}
-	return err
 }
 
 // check interfaces
