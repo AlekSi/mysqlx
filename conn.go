@@ -72,7 +72,8 @@ func open(dataSource string) (*conn, error) {
 
 		switch k {
 		case "_trace":
-			t, err := strconv.ParseBool(v)
+			var t bool
+			t, err = strconv.ParseBool(v)
 			if err != nil {
 				return nil, fmt.Errorf("failed to handle parameter %q: %s", k, err)
 			}

@@ -260,13 +260,13 @@ func (s *MySQLXSuite) TestExecQuery() {
 }
 
 func (s *MySQLXSuite) TestBeginCommit() {
-	_, err := s.db.Exec("CREATE TEMPORARY TABLE TestBeginRollback (id int AUTO_INCREMENT, PRIMARY KEY (id))")
+	_, err := s.db.Exec("CREATE TEMPORARY TABLE TestBeginCommit (id int AUTO_INCREMENT, PRIMARY KEY (id))")
 	s.Require().NoError(err)
 
 	tx, err := s.db.Begin()
 	s.Require().NoError(err)
 
-	_, err = tx.Exec("INSERT INTO TestBeginRollback VALUES (1)")
+	_, err = tx.Exec("INSERT INTO TestBeginCommit VALUES (1)")
 	s.NoError(err)
 
 	s.NoError(tx.Commit())
@@ -274,7 +274,7 @@ func (s *MySQLXSuite) TestBeginCommit() {
 	s.Equal(sql.ErrTxDone, tx.Rollback())
 
 	var count int
-	s.NoError(s.db.QueryRow("SELECT COUNT(*) FROM TestBeginRollback").Scan(&count))
+	s.NoError(s.db.QueryRow("SELECT COUNT(*) FROM TestBeginCommit").Scan(&count))
 	s.Equal(1, count)
 }
 
