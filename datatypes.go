@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql/driver"
 	"encoding/binary"
+	"strconv"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -11,6 +12,35 @@ import (
 	"github.com/AlekSi/mysqlx/internal/mysqlx_datatypes"
 	"github.com/AlekSi/mysqlx/internal/mysqlx_resultset"
 )
+
+// TODO optimize?
+func unmarshalDecimal(value []byte) string {
+	scale := int(value[0])
+	sign := value[len(value)-1]
+	var s string
+	for _, b := range value[1 : len(value)-1] {
+		h := int((b >> 4) & 0x0f)
+		l := int(b & 0x0f)
+		s += strconv.Itoa(h) + strconv.Itoa(l)
+	}
+	if sign != 0xd0 && sign != 0xc0 {
+		h := int((sign >> 4) & 0x0f)
+		s += strconv.Itoa(h)
+		sign = sign << 4
+	}
+	if scale != 0 {
+		s = s[:len(s)-scale] + "." + s[len(s)-scale:]
+	}
+	switch sign {
+	case 0xd0:
+		return "-" + s
+	case 0xc0:
+		return s
+	default:
+		bugf("unmarshalDecimal: failed to parse decimal %#v", value)
+		return ""
+	}
+}
 
 func unmarshalValue(value []byte, column *mysqlx_resultset.ColumnMetaData) (driver.Value, error) {
 	// NULL -> nil, ignore type
@@ -34,6 +64,9 @@ func unmarshalValue(value []byte, column *mysqlx_resultset.ColumnMetaData) (driv
 			return nil, bugf("unmarshalValue: failed to decode %#v as UINT", value)
 		}
 		return int64(u64), nil
+
+	case mysqlx_resultset.ColumnMetaData_DECIMAL:
+		return unmarshalDecimal(value), nil
 
 	case mysqlx_resultset.ColumnMetaData_BYTES:
 		// VARCHAR, CHAR, GEOMETRY (and also NULL, but we handle it separately)
@@ -61,7 +94,7 @@ func unmarshalValue(value []byte, column *mysqlx_resultset.ColumnMetaData) (driv
 		return time.Date(int(year), time.Month(month), int(day), int(hour), int(min), int(sec), int(usec)*1000, time.UTC), nil
 
 	default:
-		return nil, bugf("unmarshalValue: unhandled type %s", column.Type)
+		return nil, bugf("unmarshalValue: unhandled type %s, value %#v", column.Type, value)
 	}
 }
 

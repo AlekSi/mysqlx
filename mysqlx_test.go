@@ -149,8 +149,27 @@ func (s *MySQLXSuite) TestQueryData() {
 		{`SELECT CAST(? AS UNSIGNED)`, []interface{}{42}, int64(42)},
 		{`SELECT CAST(0 AS UNSIGNED)`, nil, int64(0)},
 		{`SELECT CAST(? AS UNSIGNED)`, []interface{}{0}, int64(0)},
-		{`SELECT CAST(NULL AS SIGNED)`, nil, nil},
-		{`SELECT CAST(? AS SIGNED)`, []interface{}{nil}, nil},
+		{`SELECT CAST(NULL AS UNSIGNED)`, nil, nil},
+		{`SELECT CAST(? AS UNSIGNED)`, []interface{}{nil}, nil},
+
+		// DECIMAL
+		// values from datatypes_test.go
+		{`SELECT CAST(12.3401 AS DECIMAL(6,4))`, nil, "12.3401"},
+		{`SELECT CAST(-12.3401 AS DECIMAL(6,4))`, nil, "-12.3401"},
+		{`SELECT CAST(12.3401 AS DECIMAL(6,3))`, nil, "12.340"},
+		{`SELECT CAST(-12.3401 AS DECIMAL(6,3))`, nil, "-12.340"},
+		{`SELECT CAST(12.3401 AS DECIMAL(6))`, nil, "12"},
+		{`SELECT CAST(-12.3401 AS DECIMAL(6))`, nil, "-12"},
+		{`SELECT CAST(12.3401 AS DECIMAL(1))`, nil, "9"},       // Warning (code 1264): Out of range value
+		{`SELECT CAST(-12.3401 AS DECIMAL(1))`, nil, "-9"},     // Warning (code 1264): Out of range value
+		{`SELECT CAST(12.3401 AS DECIMAL(1,1))`, nil, "0.9"},   // Warning (code 1264): Out of range value
+		{`SELECT CAST(-12.3401 AS DECIMAL(1,1))`, nil, "-0.9"}, // Warning (code 1264): Out of range value
+
+		{`SELECT CAST(? AS DECIMAL(6,4))`, []interface{}{"-12.3401"}, "-12.3401"},
+		{`SELECT CAST(0 AS DECIMAL(6,4))`, nil, "0.0000"},
+		{`SELECT CAST(? AS DECIMAL(6,4))`, []interface{}{"0"}, "0.0000"},
+		{`SELECT CAST(NULL AS DECIMAL(6,4))`, nil, nil},
+		{`SELECT CAST(? AS DECIMAL(6,4))`, []interface{}{nil}, nil},
 
 		// DATE
 		{`SELECT CAST('2017-07-01 12:34:56.123456789' AS DATE)`, nil, time.Date(2017, 7, 1, 0, 0, 0, 0, time.UTC)},

@@ -16,6 +16,9 @@ test: build
 cover: test
 	go tool cover -html=coverage.txt
 
+bench: test
+	go test -run=NONE -bench=. -benchtime=5s -count=3 -benchmem
+
 proto:
 	cd internal && go run compile.go
 
