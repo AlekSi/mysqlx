@@ -20,6 +20,7 @@ Please wait for it.
 * Concurrent tests.
 * Benchmarks.
 * Connection string format.
+* Authentication.
 * TLS.
 * Add support for https://github.com/gogo/protobuf
 * Charsets.
