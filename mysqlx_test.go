@@ -209,6 +209,32 @@ func (s *MySQLXSuite) TestQueryData() {
 		s.False(rows.Next())
 		s.NoError(rows.Err())
 		s.NoError(rows.Close())
+
+		stmt, err := s.db.Prepare(q.query)
+		s.Require().NoError(err)
+
+		// test Prepare + QueryRow
+		actual = "NOT SET"
+		s.Require().NoError(stmt.QueryRow(q.arg...).Scan(&actual))
+		s.Equal(q.expected, actual)
+
+		// test Prepare + Query, read all rows
+		rows, err = stmt.Query(q.arg...)
+		s.Require().NoError(err)
+		types, err = rows.ColumnTypes()
+		s.NoError(err)
+		s.Require().Len(types, 1)
+		s.T().Log(types[0])
+
+		s.True(rows.Next())
+		actual = "NOT SET"
+		s.NoError(rows.Scan(&actual))
+		s.Equal(q.expected, actual)
+		s.False(rows.Next())
+		s.NoError(rows.Err())
+		s.NoError(rows.Close())
+
+		s.NoError(stmt.Close())
 	}
 }
 
@@ -284,7 +310,7 @@ func (s *MySQLXSuite) TestExec() {
 	s.NoError(err)
 	s.Equal(int64(2), ra)
 
-	res, err = s.db.Exec("UPDATE TestExec SET id = ? WHERE id = ?", 3, 2)
+	res, err = s.db.Exec("UPDATE TestExec SET id = ? WHERE id = ?", 3, 1)
 	s.Require().NoError(err)
 	id, err = res.LastInsertId()
 	s.EqualError(err, "no LastInsertId available")
@@ -292,6 +318,18 @@ func (s *MySQLXSuite) TestExec() {
 	ra, err = res.RowsAffected()
 	s.NoError(err)
 	s.Equal(int64(1), ra)
+
+	stmt, err := s.db.Prepare("UPDATE TestExec SET id = ? WHERE id = ?")
+	s.Require().NoError(err)
+	res, err = stmt.Exec(4, 2)
+	s.Require().NoError(err)
+	id, err = res.LastInsertId()
+	s.EqualError(err, "no LastInsertId available")
+	s.Equal(int64(0), id)
+	ra, err = res.RowsAffected()
+	s.NoError(err)
+	s.Equal(int64(1), ra)
+	s.NoError(stmt.Close())
 }
 
 func (s *MySQLXSuite) TestExecQuery() {

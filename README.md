@@ -24,4 +24,5 @@ Please wait for it.
 * Add support for https://github.com/gogo/protobuf
 * Charsets.
 * Time zones.
+* Real prepared statements.
 * MUCH MORE.

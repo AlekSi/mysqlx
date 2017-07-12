@@ -241,78 +241,13 @@ func (c *conn) Begin() (driver.Tx, error) {
 
 // Prepare returns a prepared statement, bound to this connection.
 func (c *conn) Prepare(query string) (driver.Stmt, error) {
-	return nil, bugf("conn.Prepare not implemented yet")
+	return &stmt{
+		c:     c,
+		query: query,
+	}, nil
 }
 
-func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
-	stmt := &mysqlx_sql.StmtExecute{
-		Stmt: []byte(query),
-	}
-	for _, arg := range args {
-		a, err := marshalValue(arg)
-		if err != nil {
-			return nil, err
-		}
-		stmt.Args = append(stmt.Args, a)
-	}
-
-	if err := c.writeMessage(stmt); err != nil {
-		return nil, c.close(err)
-	}
-
-	rows := rows{
-		c:       c,
-		columns: make([]mysqlx_resultset.ColumnMetaData, 0, 1),
-		rows:    make(chan *mysqlx_resultset.Row, rowsCap),
-	}
-	for {
-		m, err := c.readMessage()
-		if err != nil {
-			return nil, c.close(err)
-		}
-
-		switch m := m.(type) {
-		case *mysqlx.Error:
-			severity := Severity(m.GetSeverity())
-
-			// TODO close connection if severity is FATAL?
-
-			return nil, &Error{
-				Severity: severity,
-				Code:     m.GetCode(),
-				SQLState: m.GetSqlState(),
-				Msg:      m.GetMsg(),
-			}
-
-		case *mysqlx_resultset.ColumnMetaData:
-			rows.columns = append(rows.columns, *m)
-
-		// query with rows
-		case *mysqlx_resultset.Row:
-			rows.rows <- m
-			go rows.runReader()
-			return &rows, nil
-
-		// query without rows
-		case *mysqlx_resultset.FetchDone:
-			continue
-		case *mysqlx_notice.SessionStateChanged:
-			switch m.GetParam() {
-			case mysqlx_notice.SessionStateChanged_ROWS_AFFECTED:
-				continue
-			default:
-				return nil, bugf("conn.Query: unhandled session state change %v", m)
-			}
-		case *mysqlx_sql.StmtExecuteOk:
-			close(rows.rows)
-			return &rows, nil
-
-		default:
-			return nil, bugf("conn.Query: unhandled type %T", m)
-		}
-	}
-}
-
+// Exec executes a query that doesn't return rows, such as an INSERT or UPDATE.
 func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 	stmt := &mysqlx_sql.StmtExecute{
 		Stmt: []byte(query),
@@ -382,6 +317,76 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 
 		default:
 			return nil, bugf("conn.Exec: unhandled type %T", m)
+		}
+	}
+}
+
+// Query executes a query that may return rows, such as a SELECT.
+func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
+	stmt := &mysqlx_sql.StmtExecute{
+		Stmt: []byte(query),
+	}
+	for _, arg := range args {
+		a, err := marshalValue(arg)
+		if err != nil {
+			return nil, err
+		}
+		stmt.Args = append(stmt.Args, a)
+	}
+
+	if err := c.writeMessage(stmt); err != nil {
+		return nil, c.close(err)
+	}
+
+	rows := rows{
+		c:       c,
+		columns: make([]mysqlx_resultset.ColumnMetaData, 0, 1),
+		rows:    make(chan *mysqlx_resultset.Row, rowsCap),
+	}
+	for {
+		m, err := c.readMessage()
+		if err != nil {
+			return nil, c.close(err)
+		}
+
+		switch m := m.(type) {
+		case *mysqlx.Error:
+			severity := Severity(m.GetSeverity())
+
+			// TODO close connection if severity is FATAL?
+
+			return nil, &Error{
+				Severity: severity,
+				Code:     m.GetCode(),
+				SQLState: m.GetSqlState(),
+				Msg:      m.GetMsg(),
+			}
+
+		case *mysqlx_resultset.ColumnMetaData:
+			rows.columns = append(rows.columns, *m)
+
+		// query with rows
+		case *mysqlx_resultset.Row:
+			rows.rows <- m
+			go rows.runReader()
+			return &rows, nil
+
+		// query without rows
+		case *mysqlx_resultset.FetchDone:
+			continue
+		case *mysqlx_notice.SessionStateChanged:
+			switch m.GetParam() {
+			case mysqlx_notice.SessionStateChanged_ROWS_AFFECTED:
+				continue
+			default:
+				return nil, bugf("conn.Query: unhandled session state change %v", m)
+			}
+		case *mysqlx_sql.StmtExecuteOk:
+			close(rows.rows)
+			return &rows, nil
+
+		default:
+			return nil, bugf("conn.Query: unhandled type %T", m)
 		}
 	}
 }
@@ -523,8 +528,8 @@ func (c *conn) readMessage() (proto.Message, error) {
 // check interfaces
 var (
 	_ driver.Conn    = (*conn)(nil)
-	_ driver.Queryer = (*conn)(nil)
 	_ driver.Execer  = (*conn)(nil)
+	_ driver.Queryer = (*conn)(nil)
 	_ driver.Pinger  = (*conn)(nil)
 
 	// TODO
