@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
 type City struct {
@@ -46,44 +45,40 @@ type ColumnType struct {
 	// TODO more checks
 }
 
-type MySQLXSuite struct {
-	suite.Suite
-	db *sql.DB
-}
-
-func TestMySQLX(t *testing.T) {
-	suite.Run(t, new(MySQLXSuite))
-}
-
-func (s *MySQLXSuite) SetupTest() {
-	testTraceF = s.T().Logf
+func openDB(t *testing.T, database string) *sql.DB {
+	testTraceF = t.Logf
 
 	ds := os.Getenv("MYSQLX_TEST_DATASOURCE")
-	s.Require().NotEmpty(ds, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
+	require.NotEmpty(t, ds, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
 	u, err := url.Parse(ds)
-	s.Require().NoError(err)
-	u.Path = "world_x"
+	require.NoError(t, err)
+	u.Path = database
 
-	s.db, err = sql.Open("mysqlx", u.String())
-	s.Require().NoError(err)
-	s.Require().NoError(s.db.Ping())
+	db, err := sql.Open("mysqlx", u.String())
+	require.NoError(t, err)
+	require.NoError(t, db.Ping())
+	return db
 }
 
-func (s *MySQLXSuite) TearDownTest() {
-	s.NoError(s.db.Close())
+func closeDB(t *testing.T, db *sql.DB) {
+	assert.NoError(t, db.Close())
 }
 
-func (s *MySQLXSuite) TestQueryTable() {
-	rows, err := s.db.Query("SELECT ID, Name, District, Info FROM city WHERE CountryCode = ? ORDER BY ID LIMIT 3", "RUS")
-	s.Require().NoError(err)
+func TestQueryTable(t *testing.T) {
+	// t.Parallel()
+	db := openDB(t, "world_x")
+	defer closeDB(t, db)
+
+	rows, err := db.Query("SELECT ID, Name, District, Info FROM city WHERE CountryCode = ? ORDER BY ID LIMIT 3", "RUS")
+	require.NoError(t, err)
 
 	columns, err := rows.Columns()
-	s.NoError(err)
-	s.Equal([]string{"ID", "Name", "District", "Info"}, columns)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"ID", "Name", "District", "Info"}, columns)
 
 	types, err := rows.ColumnTypes()
-	s.NoError(err)
-	s.Require().Len(types, 4)
+	assert.NoError(t, err)
+	require.Len(t, types, 4)
 	for i, expected := range []ColumnType{
 		// TODO convert internal X Protocol types to MySQL types (?)
 		{"ID", "SINT", 11},        // FIXME should length of int(11) really be 11?
@@ -91,13 +86,13 @@ func (s *MySQLXSuite) TestQueryTable() {
 		{"District", "BYTES", 20 * 3},
 		{"Info", "BYTES", math.MaxInt64},
 	} {
-		s.Equal(expected.Name, types[i].Name(), "type %+v", types[i])
-		s.Equal(expected.DatabaseTypeName, types[i].DatabaseTypeName(), "type %+v", types[i])
+		assert.Equal(t, expected.Name, types[i].Name(), "type %+v", types[i])
+		assert.Equal(t, expected.DatabaseTypeName, types[i].DatabaseTypeName(), "type %+v", types[i])
 		l, ok := types[i].Length()
 		if !ok {
 			l = -1
 		}
-		s.Equal(expected.Length, l, "type %+v", types[i])
+		assert.Equal(t, expected.Length, l, "type %+v", types[i])
 		// TODO more checks
 	}
 
@@ -106,18 +101,22 @@ func (s *MySQLXSuite) TestQueryTable() {
 		{3581, "St Petersburg", "Pietari", `{"Population": 4694000}`},
 		{3582, "Novosibirsk", "Novosibirsk", `{"Population": 1398800}`},
 	} {
-		s.True(rows.Next())
+		assert.True(t, rows.Next())
 		var actual City
-		s.NoError(rows.Scan(actual.Pointers()...))
-		s.Equal(expected, actual)
+		assert.NoError(t, rows.Scan(actual.Pointers()...))
+		assert.Equal(t, expected, actual)
 	}
 
-	s.False(rows.Next())
-	s.NoError(rows.Err())
-	s.NoError(rows.Close())
+	assert.False(t, rows.Next())
+	assert.NoError(t, rows.Err())
+	assert.NoError(t, rows.Close())
 }
 
-func (s *MySQLXSuite) TestQueryData() {
+func TestQueryData(t *testing.T) {
+	// t.Parallel()
+	db := openDB(t, "world_x")
+	defer closeDB(t, db)
+
 	fullDate := time.Date(2017, 7, 1, 12, 34, 56, 123456789, time.UTC)
 	for _, q := range []struct {
 		query    string
@@ -191,222 +190,239 @@ func (s *MySQLXSuite) TestQueryData() {
 	} {
 		// test QueryRow
 		var actual interface{} = "NOT SET"
-		s.Require().NoError(s.db.QueryRow(q.query, q.arg...).Scan(&actual))
-		s.Equal(q.expected, actual)
+		require.NoError(t, db.QueryRow(q.query, q.arg...).Scan(&actual))
+		assert.Equal(t, q.expected, actual)
 
 		// test Query, read all rows
-		rows, err := s.db.Query(q.query, q.arg...)
-		s.Require().NoError(err)
+		rows, err := db.Query(q.query, q.arg...)
+		require.NoError(t, err)
 		types, err := rows.ColumnTypes()
-		s.NoError(err)
-		s.Require().Len(types, 1)
-		s.T().Log(types[0])
+		assert.NoError(t, err)
+		require.Len(t, types, 1)
+		t.Log(types[0])
 
-		s.True(rows.Next())
+		assert.True(t, rows.Next())
 		actual = "NOT SET"
-		s.NoError(rows.Scan(&actual))
-		s.Equal(q.expected, actual)
-		s.False(rows.Next())
-		s.NoError(rows.Err())
-		s.NoError(rows.Close())
+		assert.NoError(t, rows.Scan(&actual))
+		assert.Equal(t, q.expected, actual)
+		assert.False(t, rows.Next())
+		assert.NoError(t, rows.Err())
+		assert.NoError(t, rows.Close())
 
-		stmt, err := s.db.Prepare(q.query)
-		s.Require().NoError(err)
+		stmt, err := db.Prepare(q.query)
+		require.NoError(t, err)
 
 		// test Prepare + QueryRow
 		actual = "NOT SET"
-		s.Require().NoError(stmt.QueryRow(q.arg...).Scan(&actual))
-		s.Equal(q.expected, actual)
+		require.NoError(t, stmt.QueryRow(q.arg...).Scan(&actual))
+		assert.Equal(t, q.expected, actual)
 
 		// test Prepare + Query, read all rows
 		rows, err = stmt.Query(q.arg...)
-		s.Require().NoError(err)
+		require.NoError(t, err)
 		types, err = rows.ColumnTypes()
-		s.NoError(err)
-		s.Require().Len(types, 1)
-		s.T().Log(types[0])
+		assert.NoError(t, err)
+		require.Len(t, types, 1)
+		t.Log(types[0])
 
-		s.True(rows.Next())
+		assert.True(t, rows.Next())
 		actual = "NOT SET"
-		s.NoError(rows.Scan(&actual))
-		s.Equal(q.expected, actual)
-		s.False(rows.Next())
-		s.NoError(rows.Err())
-		s.NoError(rows.Close())
+		assert.NoError(t, rows.Scan(&actual))
+		assert.Equal(t, q.expected, actual)
+		assert.False(t, rows.Next())
+		assert.NoError(t, rows.Err())
+		assert.NoError(t, rows.Close())
 
-		s.NoError(stmt.Close())
+		assert.NoError(t, stmt.Close())
 	}
 }
 
-func (s *MySQLXSuite) TestQueryEmpty() {
-	_, err := s.db.Exec("CREATE TEMPORARY TABLE TestQueryEmpty (id int AUTO_INCREMENT, PRIMARY KEY (id))")
-	s.Require().NoError(err)
+func TestQueryEmpty(t *testing.T) {
+	// t.Parallel()
+	db := openDB(t, "world_x")
+	defer closeDB(t, db)
+
+	_, err := db.Exec("CREATE TEMPORARY TABLE TestQueryEmpty (id int AUTO_INCREMENT, PRIMARY KEY (id))")
+	require.NoError(t, err)
 
 	var actual interface{} = "NOT SET"
-	s.Equal(sql.ErrNoRows, s.db.QueryRow("SELECT * FROM TestQueryEmpty").Scan(&actual))
-	s.Equal("NOT SET", actual)
+	assert.Equal(t, sql.ErrNoRows, db.QueryRow("SELECT * FROM TestQueryEmpty").Scan(&actual))
+	assert.Equal(t, "NOT SET", actual)
 }
 
-func (s *MySQLXSuite) TestQueryExec() {
+func TestQueryExec(t *testing.T) {
+	// t.Parallel()
+	db := openDB(t, "world_x")
+	defer closeDB(t, db)
+
 	// test QueryRow
 	var actual interface{} = "NOT SET"
-	s.Equal(sql.ErrNoRows, s.db.QueryRow(`CREATE TEMPORARY TABLE TestQueryExec1 (id int)`).Scan(&actual))
-	s.Equal("NOT SET", actual)
+	assert.Equal(t, sql.ErrNoRows, db.QueryRow(`CREATE TEMPORARY TABLE TestQueryExec1 (id int)`).Scan(&actual))
+	assert.Equal(t, "NOT SET", actual)
 
 	// test Query, read all rows
-	rows, err := s.db.Query(`CREATE TEMPORARY TABLE TestQueryExec2 (id int)`)
-	s.Require().NoError(err)
+	rows, err := db.Query(`CREATE TEMPORARY TABLE TestQueryExec2 (id int)`)
+	require.NoError(t, err)
 	types, err := rows.ColumnTypes()
-	s.NoError(err)
-	s.Len(types, 0)
-	s.False(rows.Next())
-	s.NoError(rows.Err())
-	s.NoError(rows.Close())
+	assert.NoError(t, err)
+	assert.Len(t, types, 0)
+	assert.False(t, rows.Next())
+	assert.NoError(t, rows.Err())
+	assert.NoError(t, rows.Close())
 }
 
-func (s *MySQLXSuite) TestQueryCloseEarly() {
+func TestQueryCloseEarly(t *testing.T) {
+	// t.Parallel()
+	db := openDB(t, "world_x")
+	defer closeDB(t, db)
+
 	// read 0 rows
-	rows, err := s.db.Query("SELECT ID, Name, District, Info FROM city WHERE CountryCode = ? ORDER BY ID LIMIT 3", "RUS")
-	s.Require().NoError(err)
-	s.NoError(rows.Close())
+	rows, err := db.Query("SELECT ID, Name, District, Info FROM city WHERE CountryCode = ? ORDER BY ID LIMIT 3", "RUS")
+	require.NoError(t, err)
+	assert.NoError(t, rows.Close())
 
 	// read 1 row
 	var city City
-	rows, err = s.db.Query("SELECT ID, Name, District, Info FROM city WHERE CountryCode = ? ORDER BY ID LIMIT 3", "USA")
-	s.Require().NoError(err)
-	s.True(rows.Next())
-	s.NoError(rows.Scan(city.Pointers()...))
-	s.Equal(City{3793, "New York", "New York", `{"Population": 8008278}`}, city)
-	s.NoError(rows.Close())
+	rows, err = db.Query("SELECT ID, Name, District, Info FROM city WHERE CountryCode = ? ORDER BY ID LIMIT 3", "USA")
+	require.NoError(t, err)
+	assert.True(t, rows.Next())
+	assert.NoError(t, rows.Scan(city.Pointers()...))
+	assert.Equal(t, City{3793, "New York", "New York", `{"Population": 8008278}`}, city)
+	assert.NoError(t, rows.Close())
 
 	// read 2 rows
-	rows, err = s.db.Query("SELECT ID, Name, District, Info FROM city WHERE CountryCode = ? ORDER BY ID LIMIT 3", "FRA")
-	s.Require().NoError(err)
-	s.True(rows.Next())
-	s.NoError(rows.Scan(city.Pointers()...))
-	s.Equal(City{2974, "Paris", "Île-de-France", `{"Population": 2125246}`}, city)
-	s.True(rows.Next())
-	s.NoError(rows.Scan(city.Pointers()...))
-	s.Equal(City{2975, "Marseille", "Provence-Alpes-Côte", `{"Population": 798430}`}, city)
-	s.NoError(rows.Close())
+	rows, err = db.Query("SELECT ID, Name, District, Info FROM city WHERE CountryCode = ? ORDER BY ID LIMIT 3", "FRA")
+	require.NoError(t, err)
+	assert.True(t, rows.Next())
+	assert.NoError(t, rows.Scan(city.Pointers()...))
+	assert.Equal(t, City{2974, "Paris", "Île-de-France", `{"Population": 2125246}`}, city)
+	assert.True(t, rows.Next())
+	assert.NoError(t, rows.Scan(city.Pointers()...))
+	assert.Equal(t, City{2975, "Marseille", "Provence-Alpes-Côte", `{"Population": 798430}`}, city)
+	assert.NoError(t, rows.Close())
 }
 
-func (s *MySQLXSuite) TestExec() {
-	res, err := s.db.Exec("CREATE TEMPORARY TABLE TestExec (id int AUTO_INCREMENT, PRIMARY KEY (id))")
-	s.Require().NoError(err)
+func TestExec(t *testing.T) {
+	// t.Parallel()
+	db := openDB(t, "world_x")
+	defer closeDB(t, db)
+
+	res, err := db.Exec("CREATE TEMPORARY TABLE TestExec (id int AUTO_INCREMENT, PRIMARY KEY (id))")
+	require.NoError(t, err)
 	id, err := res.LastInsertId()
-	s.EqualError(err, "no LastInsertId available")
-	s.Equal(int64(0), id)
+	assert.EqualError(t, err, "no LastInsertId available")
+	assert.Equal(t, int64(0), id)
 	ra, err := res.RowsAffected()
-	s.NoError(err)
-	s.Equal(int64(0), ra)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), ra)
 
-	res, err = s.db.Exec("INSERT INTO TestExec VALUES (1), (2)")
-	s.Require().NoError(err)
+	res, err = db.Exec("INSERT INTO TestExec VALUES (1), (2)")
+	require.NoError(t, err)
 	id, err = res.LastInsertId()
-	s.NoError(err)
-	s.Equal(int64(2), id)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(2), id)
 	ra, err = res.RowsAffected()
-	s.NoError(err)
-	s.Equal(int64(2), ra)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(2), ra)
 
-	res, err = s.db.Exec("UPDATE TestExec SET id = ? WHERE id = ?", 3, 1)
-	s.Require().NoError(err)
+	res, err = db.Exec("UPDATE TestExec SET id = ? WHERE id = ?", 3, 1)
+	require.NoError(t, err)
 	id, err = res.LastInsertId()
-	s.EqualError(err, "no LastInsertId available")
-	s.Equal(int64(0), id)
+	assert.EqualError(t, err, "no LastInsertId available")
+	assert.Equal(t, int64(0), id)
 	ra, err = res.RowsAffected()
-	s.NoError(err)
-	s.Equal(int64(1), ra)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), ra)
 
-	stmt, err := s.db.Prepare("UPDATE TestExec SET id = ? WHERE id = ?")
-	s.Require().NoError(err)
+	stmt, err := db.Prepare("UPDATE TestExec SET id = ? WHERE id = ?")
+	require.NoError(t, err)
 	res, err = stmt.Exec(4, 2)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 	id, err = res.LastInsertId()
-	s.EqualError(err, "no LastInsertId available")
-	s.Equal(int64(0), id)
+	assert.EqualError(t, err, "no LastInsertId available")
+	assert.Equal(t, int64(0), id)
 	ra, err = res.RowsAffected()
-	s.NoError(err)
-	s.Equal(int64(1), ra)
-	s.NoError(stmt.Close())
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), ra)
+	assert.NoError(t, stmt.Close())
 }
 
-func (s *MySQLXSuite) TestExecQuery() {
-	res, err := s.db.Exec("SELECT 1")
-	s.NoError(err)
+func TestExecQuery(t *testing.T) {
+	// t.Parallel()
+	db := openDB(t, "world_x")
+	defer closeDB(t, db)
+
+	res, err := db.Exec("SELECT 1")
+	assert.NoError(t, err)
 	id, err := res.LastInsertId()
-	s.EqualError(err, "no LastInsertId available")
-	s.Equal(int64(0), id)
+	assert.EqualError(t, err, "no LastInsertId available")
+	assert.Equal(t, int64(0), id)
 	ra, err := res.RowsAffected()
-	s.NoError(err)
-	s.Equal(int64(0), ra)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), ra)
 }
 
-func (s *MySQLXSuite) TestBeginCommit() {
-	_, err := s.db.Exec("CREATE TEMPORARY TABLE TestBeginCommit (id int AUTO_INCREMENT, PRIMARY KEY (id))")
-	s.Require().NoError(err)
+func TestBeginCommit(t *testing.T) {
+	// t.Parallel()
+	db := openDB(t, "world_x")
+	defer closeDB(t, db)
 
-	tx, err := s.db.Begin()
-	s.Require().NoError(err)
+	_, err := db.Exec("CREATE TEMPORARY TABLE TestBeginCommit (id int AUTO_INCREMENT, PRIMARY KEY (id))")
+	require.NoError(t, err)
+
+	tx, err := db.Begin()
+	require.NoError(t, err)
 
 	_, err = tx.Exec("INSERT INTO TestBeginCommit VALUES (1)")
-	s.NoError(err)
+	assert.NoError(t, err)
 
-	s.NoError(tx.Commit())
-	s.Equal(sql.ErrTxDone, tx.Commit())
-	s.Equal(sql.ErrTxDone, tx.Rollback())
+	assert.NoError(t, tx.Commit())
+	assert.Equal(t, sql.ErrTxDone, tx.Commit())
+	assert.Equal(t, sql.ErrTxDone, tx.Rollback())
 
 	var count int
-	s.NoError(s.db.QueryRow("SELECT COUNT(*) FROM TestBeginCommit").Scan(&count))
-	s.Equal(1, count)
+	assert.NoError(t, db.QueryRow("SELECT COUNT(*) FROM TestBeginCommit").Scan(&count))
+	assert.Equal(t, 1, count)
 }
 
-func (s *MySQLXSuite) TestBeginRollback() {
-	_, err := s.db.Exec("CREATE TEMPORARY TABLE TestBeginRollback (id int AUTO_INCREMENT, PRIMARY KEY (id))")
-	s.Require().NoError(err)
+func TestBeginRollback(t *testing.T) {
+	// t.Parallel()
+	db := openDB(t, "world_x")
+	defer closeDB(t, db)
 
-	tx, err := s.db.Begin()
-	s.Require().NoError(err)
+	_, err := db.Exec("CREATE TEMPORARY TABLE TestBeginRollback (id int AUTO_INCREMENT, PRIMARY KEY (id))")
+	require.NoError(t, err)
+
+	tx, err := db.Begin()
+	require.NoError(t, err)
 
 	_, err = tx.Exec("INSERT INTO TestBeginRollback VALUES (1)")
-	s.NoError(err)
+	assert.NoError(t, err)
 
-	s.NoError(tx.Rollback())
-	s.Equal(sql.ErrTxDone, tx.Rollback())
-	s.Equal(sql.ErrTxDone, tx.Commit())
+	assert.NoError(t, tx.Rollback())
+	assert.Equal(t, sql.ErrTxDone, tx.Rollback())
+	assert.Equal(t, sql.ErrTxDone, tx.Commit())
 
 	var count int
-	s.NoError(s.db.QueryRow("SELECT COUNT(*) FROM TestBeginRollback").Scan(&count))
-	s.Equal(0, count)
+	assert.NoError(t, db.QueryRow("SELECT COUNT(*) FROM TestBeginRollback").Scan(&count))
+	assert.Equal(t, 0, count)
 }
 
 func TestNoDatabase(t *testing.T) {
-	testTraceF = t.Logf
-
-	ds := os.Getenv("MYSQLX_TEST_DATASOURCE")
-	require.NotEmpty(t, ds, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
-	u, err := url.Parse(ds)
-	require.NoError(t, err)
-
-	db, err := sql.Open("mysqlx", u.String())
-	require.NoError(t, err)
-	defer func() {
-		assert.NoError(t, db.Close())
-	}()
-
-	require.NoError(t, db.Ping())
+	// t.Parallel()
+	db := openDB(t, "")
+	defer closeDB(t, db)
 
 	var s string
 	require.NoError(t, db.QueryRow("SELECT VERSION()").Scan(&s))
 	t.Log(s)
 
-	err = db.QueryRow("SELECT Name FROM city LIMIT 1").Scan(&s)
+	err := db.QueryRow("SELECT Name FROM city LIMIT 1").Scan(&s)
 	assert.Equal(t, &Error{Severity: SeverityError, Code: 1046, SQLState: "3D000", Msg: "No database selected"}, err)
-	assert.Equal(t, "ERROR 1046 (3D000): No database selected", err.Error())
+	assert.EqualError(t, err, "ERROR 1046 (3D000): No database selected")
 
 	res, err := db.Exec("UPDATE city SET Name = ?", "Moscow")
 	assert.Nil(t, res)
 	assert.Equal(t, &Error{Severity: SeverityError, Code: 1046, SQLState: "3D000", Msg: "No database selected"}, err)
-	assert.Equal(t, "ERROR 1046 (3D000): No database selected", err.Error())
+	assert.EqualError(t, err, "ERROR 1046 (3D000): No database selected")
 }
