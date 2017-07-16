@@ -46,13 +46,17 @@ type ColumnType struct {
 }
 
 func openDB(t *testing.T, database string) *sql.DB {
-	testTraceF = t.Logf
+	// t.Helper()  TODO enable when Go 1.9 is released
+	setTestTracef(t.Name(), t.Logf)
 
 	ds := os.Getenv("MYSQLX_TEST_DATASOURCE")
 	require.NotEmpty(t, ds, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
 	u, err := url.Parse(ds)
 	require.NoError(t, err)
 	u.Path = database
+	q := u.Query()
+	q.Set("_trace", t.Name())
+	u.RawQuery = q.Encode()
 
 	db, err := sql.Open("mysqlx", u.String())
 	require.NoError(t, err)
@@ -65,7 +69,7 @@ func closeDB(t *testing.T, db *sql.DB) {
 }
 
 func TestQueryTable(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
 	db := openDB(t, "world_x")
 	defer closeDB(t, db)
 
@@ -113,7 +117,7 @@ func TestQueryTable(t *testing.T) {
 }
 
 func TestQueryData(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
 	db := openDB(t, "world_x")
 	defer closeDB(t, db)
 
@@ -238,7 +242,7 @@ func TestQueryData(t *testing.T) {
 }
 
 func TestQueryEmpty(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
 	db := openDB(t, "world_x")
 	defer closeDB(t, db)
 
@@ -251,7 +255,7 @@ func TestQueryEmpty(t *testing.T) {
 }
 
 func TestQueryExec(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
 	db := openDB(t, "world_x")
 	defer closeDB(t, db)
 
@@ -272,7 +276,7 @@ func TestQueryExec(t *testing.T) {
 }
 
 func TestQueryCloseEarly(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
 	db := openDB(t, "world_x")
 	defer closeDB(t, db)
 
@@ -303,7 +307,7 @@ func TestQueryCloseEarly(t *testing.T) {
 }
 
 func TestExec(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
 	db := openDB(t, "world_x")
 	defer closeDB(t, db)
 
@@ -348,7 +352,7 @@ func TestExec(t *testing.T) {
 }
 
 func TestExecQuery(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
 	db := openDB(t, "world_x")
 	defer closeDB(t, db)
 
@@ -363,7 +367,7 @@ func TestExecQuery(t *testing.T) {
 }
 
 func TestBeginCommit(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
 	db := openDB(t, "world_x")
 	defer closeDB(t, db)
 
@@ -386,7 +390,7 @@ func TestBeginCommit(t *testing.T) {
 }
 
 func TestBeginRollback(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
 	db := openDB(t, "world_x")
 	defer closeDB(t, db)
 
@@ -409,7 +413,7 @@ func TestBeginRollback(t *testing.T) {
 }
 
 func TestNoDatabase(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
 	db := openDB(t, "")
 	defer closeDB(t, db)
 

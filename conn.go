@@ -6,12 +6,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/url"
-	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -24,13 +21,6 @@ import (
 	"github.com/AlekSi/mysqlx/internal/mysqlx_session"
 	"github.com/AlekSi/mysqlx/internal/mysqlx_sql"
 )
-
-type traceFunc func(format string, v ...interface{})
-
-func noTrace(string, ...interface{}) {}
-
-// for tests only
-var testTraceF traceFunc
 
 // TODO make this configurable?
 // It should not be less then 1.
@@ -79,21 +69,10 @@ func open(dataSource string) (*conn, error) {
 
 		switch k {
 		case "_trace":
-			var t bool
-			t, err = strconv.ParseBool(v)
-			if err != nil {
-				return nil, fmt.Errorf("failed to handle parameter %q: %s", k, err)
-			}
-			if t {
-				traceF = log.New(os.Stderr, "mysqlx: ", log.Lshortfile).Printf
-			}
+			traceF = getTracef(v)
 		default:
 			return nil, fmt.Errorf("unexpected parameter %q", k)
 		}
-	}
-
-	if testTraceF != nil {
-		traceF = testTraceF
 	}
 
 	conn, err := net.Dial(u.Scheme, u.Host)
