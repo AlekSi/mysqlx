@@ -43,7 +43,7 @@ type conn struct {
 	transport net.Conn
 	tracef    traceFunc
 
-	closeOnce *sync.Once
+	closeOnce sync.Once
 	closeErr  error
 }
 
@@ -53,8 +53,6 @@ func newConn(transport net.Conn, traceF traceFunc) *conn {
 	return &conn{
 		transport: transport,
 		tracef:    traceF,
-
-		closeOnce: new(sync.Once),
 	}
 }
 
