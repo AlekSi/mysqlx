@@ -14,6 +14,8 @@ import (
 	_ "github.com/AlekSi/mysqlx"
 )
 
+const timeout = 60 * time.Second
+
 func main() {
 	log.SetFlags(0)
 	flag.Usage = func() {
@@ -33,18 +35,24 @@ func main() {
 
 	log.Printf("Connecting to %s ...", u)
 	start := time.Now()
+	var prevErr error
+	var attempts int
 	for {
+		attempts++
 		db, err := sql.Open("mysqlx", u.String())
 		if err == nil {
 			err = db.Ping()
 		}
 
 		if err != nil {
-			log.Print(err)
-			if time.Since(start) > 30*time.Second {
-				log.Fatal("Failed!")
+			if prevErr != err || attempts%10 == 0 {
+				log.Print(err)
+				prevErr = err
 			}
-			time.Sleep(2 * time.Second)
+			if time.Since(start) > timeout {
+				log.Fatalf("Failed! Last error: %s", err)
+			}
+			time.Sleep(time.Second)
 			continue
 		}
 
