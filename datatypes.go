@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql/driver"
 	"encoding/binary"
+	"math"
 	"strconv"
 	"time"
 
@@ -65,6 +66,20 @@ func unmarshalValue(value []byte, column *mysqlx_resultset.ColumnMetaData) (driv
 		}
 		return int64(u64), nil
 
+	case mysqlx_resultset.ColumnMetaData_DOUBLE:
+		u64, err := proto.NewBuffer(value).DecodeFixed64()
+		if err != nil {
+			return nil, bugf("unmarshalValue: failed to decode %#v as DOUBLE: %s", value, err)
+		}
+		return math.Float64frombits(u64), nil
+
+	case mysqlx_resultset.ColumnMetaData_FLOAT:
+		u64, err := proto.NewBuffer(value).DecodeFixed32()
+		if err != nil {
+			return nil, bugf("unmarshalValue: failed to decode %#v as FLOAT: %s", value, err)
+		}
+		return float64(math.Float32frombits(uint32(u64))), nil
+
 	case mysqlx_resultset.ColumnMetaData_DECIMAL:
 		return unmarshalDecimal(value), nil
 
@@ -116,6 +131,15 @@ func marshalValue(value driver.Value) (*mysqlx_datatypes.Any, error) {
 			Scalar: &mysqlx_datatypes.Scalar{
 				Type:       mysqlx_datatypes.Scalar_V_SINT.Enum(),
 				VSignedInt: proto.Int64(value),
+			},
+		}, nil
+
+	case float64:
+		return &mysqlx_datatypes.Any{
+			Type: mysqlx_datatypes.Any_SCALAR.Enum(),
+			Scalar: &mysqlx_datatypes.Scalar{
+				Type:    mysqlx_datatypes.Scalar_V_DOUBLE.Enum(),
+				VDouble: proto.Float64(value),
 			},
 		}, nil
 

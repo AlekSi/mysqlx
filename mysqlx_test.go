@@ -41,7 +41,7 @@ type CountryLanguage struct {
 	CountryCode string
 	Language    string
 	IsOfficial  bool
-	// Percentage  float64
+	Percentage  float32
 }
 
 func (cl *CountryLanguage) Values() []interface{} {
@@ -49,7 +49,7 @@ func (cl *CountryLanguage) Values() []interface{} {
 		cl.CountryCode,
 		cl.Language,
 		cl.IsOfficial,
-		// cl.Percentage,
+		cl.Percentage,
 	}
 }
 
@@ -58,7 +58,7 @@ func (cl *CountryLanguage) Pointers() []interface{} {
 		&cl.CountryCode,
 		&cl.Language,
 		&cl.IsOfficial,
-		// &cl.Percentage,
+		&cl.Percentage,
 	}
 }
 
@@ -146,21 +146,22 @@ func TestQueryTableCountryLanguage(t *testing.T) {
 	db := openDB(t, "world_x")
 	defer closeDB(t, db)
 
-	rows, err := db.Query("SELECT CountryCode, Language, IsOfficial FROM countrylanguage WHERE CountryCode = ? ORDER BY Percentage DESC LIMIT 3", "RUS")
+	rows, err := db.Query("SELECT CountryCode, Language, IsOfficial, Percentage FROM countrylanguage WHERE CountryCode = ? ORDER BY Percentage DESC LIMIT 3", "RUS")
 	require.NoError(t, err)
 
 	columns, err := rows.Columns()
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"CountryCode", "Language", "IsOfficial"}, columns)
+	assert.Equal(t, []string{"CountryCode", "Language", "IsOfficial", "Percentage"}, columns)
 
 	types, err := rows.ColumnTypes()
 	assert.NoError(t, err)
-	require.Len(t, types, 3)
+	require.Len(t, types, 4)
 	for i, expected := range []ColumnType{
 		// TODO convert internal X Protocol types to MySQL types (?)
 		{"CountryCode", "BYTES", 3 * 3}, // CHAR(3) (inlike VARCHAR) stores 3 bytes per utf8 rune
 		{"Language", "BYTES", 30 * 3},
 		{"IsOfficial", "ENUM", 1 * 3},
+		{"Percentage", "FLOAT", 4},
 	} {
 		assert.Equal(t, expected.Name, types[i].Name(), "type %+v", types[i])
 		assert.Equal(t, expected.DatabaseTypeName, types[i].DatabaseTypeName(), "type %+v", types[i])
@@ -173,9 +174,9 @@ func TestQueryTableCountryLanguage(t *testing.T) {
 	}
 
 	for _, expected := range []CountryLanguage{
-		{"RUS", "Russian", true},
-		{"RUS", "Tatar", false},
-		{"RUS", "Ukrainian", false},
+		{"RUS", "Russian", true, 86.6},
+		{"RUS", "Tatar", false, 3.2},
+		{"RUS", "Ukrainian", false, 1.3},
 	} {
 		assert.True(t, rows.Next())
 		var actual CountryLanguage
@@ -226,6 +227,10 @@ func TestQueryData(t *testing.T) {
 		{`SELECT CAST(? AS UNSIGNED)`, []interface{}{0}, int64(0)},
 		{`SELECT CAST(NULL AS UNSIGNED)`, nil, nil},
 		{`SELECT CAST(? AS UNSIGNED)`, []interface{}{nil}, nil},
+
+		// floats are returned as strings
+		{`SELECT 12.3401`, nil, "12.3401"},
+		{`SELECT ?`, []interface{}{12.3401}, "12.3401"},
 
 		// DECIMAL
 		// values from datatypes_test.go
