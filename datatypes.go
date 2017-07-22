@@ -68,7 +68,7 @@ func unmarshalValue(value []byte, column *mysqlx_resultset.ColumnMetaData) (driv
 	case mysqlx_resultset.ColumnMetaData_DECIMAL:
 		return unmarshalDecimal(value), nil
 
-	case mysqlx_resultset.ColumnMetaData_BYTES:
+	case mysqlx_resultset.ColumnMetaData_BYTES, mysqlx_resultset.ColumnMetaData_ENUM:
 		// VARCHAR, CHAR, GEOMETRY (and also NULL, but we handle it separately)
 		return string(value[:len(value)-1]), nil // trim last 0x00
 

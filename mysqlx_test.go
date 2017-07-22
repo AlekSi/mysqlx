@@ -37,6 +37,31 @@ func (c *City) Pointers() []interface{} {
 	}
 }
 
+type CountryLanguage struct {
+	CountryCode string
+	Language    string
+	IsOfficial  bool
+	// Percentage  float64
+}
+
+func (cl *CountryLanguage) Values() []interface{} {
+	return []interface{}{
+		cl.CountryCode,
+		cl.Language,
+		cl.IsOfficial,
+		// cl.Percentage,
+	}
+}
+
+func (cl *CountryLanguage) Pointers() []interface{} {
+	return []interface{}{
+		&cl.CountryCode,
+		&cl.Language,
+		&cl.IsOfficial,
+		// &cl.Percentage,
+	}
+}
+
 type ColumnType struct {
 	Name             string
 	DatabaseTypeName string
@@ -68,7 +93,7 @@ func closeDB(t *testing.T, db *sql.DB) {
 	assert.NoError(t, db.Close())
 }
 
-func TestQueryTable(t *testing.T) {
+func TestQueryTableCity(t *testing.T) {
 	t.Parallel()
 	db := openDB(t, "world_x")
 	defer closeDB(t, db)
@@ -107,6 +132,53 @@ func TestQueryTable(t *testing.T) {
 	} {
 		assert.True(t, rows.Next())
 		var actual City
+		assert.NoError(t, rows.Scan(actual.Pointers()...))
+		assert.Equal(t, expected, actual)
+	}
+
+	assert.False(t, rows.Next())
+	assert.NoError(t, rows.Err())
+	assert.NoError(t, rows.Close())
+}
+
+func TestQueryTableCountryLanguage(t *testing.T) {
+	t.Parallel()
+	db := openDB(t, "world_x")
+	defer closeDB(t, db)
+
+	rows, err := db.Query("SELECT CountryCode, Language, IsOfficial FROM countrylanguage WHERE CountryCode = ? ORDER BY Percentage DESC LIMIT 3", "RUS")
+	require.NoError(t, err)
+
+	columns, err := rows.Columns()
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"CountryCode", "Language", "IsOfficial"}, columns)
+
+	types, err := rows.ColumnTypes()
+	assert.NoError(t, err)
+	require.Len(t, types, 3)
+	for i, expected := range []ColumnType{
+		// TODO convert internal X Protocol types to MySQL types (?)
+		{"CountryCode", "BYTES", 3 * 3}, // CHAR(3) (inlike VARCHAR) stores 3 bytes per utf8 rune
+		{"Language", "BYTES", 30 * 3},
+		{"IsOfficial", "ENUM", 1 * 3},
+	} {
+		assert.Equal(t, expected.Name, types[i].Name(), "type %+v", types[i])
+		assert.Equal(t, expected.DatabaseTypeName, types[i].DatabaseTypeName(), "type %+v", types[i])
+		l, ok := types[i].Length()
+		if !ok {
+			l = -1
+		}
+		assert.Equal(t, expected.Length, l, "type %+v", types[i])
+		// TODO more checks
+	}
+
+	for _, expected := range []CountryLanguage{
+		{"RUS", "Russian", true},
+		{"RUS", "Tatar", false},
+		{"RUS", "Ukrainian", false},
+	} {
+		assert.True(t, rows.Next())
+		var actual CountryLanguage
 		assert.NoError(t, rows.Scan(actual.Pointers()...))
 		assert.Equal(t, expected, actual)
 	}
