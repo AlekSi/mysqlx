@@ -10,7 +10,7 @@ go_import_path: github.com/AlekSi/mysqlx
 
 env:
   global:
-    - MYSQLX_TEST_DATASOURCE='tcp://root:@127.0.0.1:33060/?time_zone=UTC'
+    - MYSQLX_TEST_DATASOURCE='tcp://my_user:my_password@127.0.0.1:33060/?time_zone=UTC'
   matrix:
     - MYSQL_IMAGE=mysql/mysql-server:5.7
     - MYSQL_IMAGE=mysql/mysql-server:8.0

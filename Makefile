@@ -1,6 +1,6 @@
 all: test
 
-export MYSQLX_TEST_DATASOURCE ?= tcp://root:@127.0.0.1:33060/?time_zone=UTC
+export MYSQLX_TEST_DATASOURCE ?= tcp://my_user:my_password@127.0.0.1:33060/?time_zone=UTC
 
 build:
 	go test -v -i
@@ -24,3 +24,4 @@ proto:
 
 seed:
 	docker exec -ti mysqlx_mysql_1 sh -c 'mysql < /test_db/mysql/world_x/world_x.sql'
+	docker exec -ti mysqlx_mysql_1 mysql -e "GRANT ALL ON world_x.* TO 'my_user'@'%';"

@@ -2,6 +2,7 @@ package mysqlx
 
 import (
 	"context"
+	"crypto/sha1"
 	"database/sql/driver"
 	"encoding/binary"
 	"fmt"
@@ -25,6 +26,38 @@ import (
 // TODO make this configurable?
 // It should not be less then 1.
 const rowsCap = 1
+
+// https://github.com/mysql/mysql-server/blob/mysql-5.7.19/rapid/plugin/x/mysqlxtest_src/password_hasher.cc
+// https://github.com/mysql/mysql-server/blob/mysql-5.7.19/rapid/plugin/x/mysqlxtest_src/mysql41_hash.cc
+func scramble(data []byte, password string) []byte {
+	hash1 := sha1.Sum([]byte(password))
+	hash2 := sha1.Sum([]byte(hash1[:]))
+
+	h := sha1.New()
+	h.Write(data)
+	h.Write(hash2[:])
+	res := h.Sum(nil)
+
+	for i := range res {
+		res[i] ^= hash1[i]
+	}
+	return res[:]
+}
+
+func authData(database, username, password string, authData []byte) []byte {
+	if len(authData) != 20 {
+		bugf("authData: expected authData to has 20 bytes, got %d", len(authData))
+		return nil
+	}
+
+	res := database + "\x00" + username + "\x00"
+	if password == "" {
+		return []byte(res)
+	}
+
+	res += fmt.Sprintf("*%02x", scramble(authData, password))
+	return []byte(res)
+}
 
 // conn is a connection to a database.
 // It is not used concurrently by multiple goroutines.
@@ -153,12 +186,9 @@ func (c *conn) auth(database, username, password string) error {
 		return c.close(err)
 	}
 	cont := m.(*mysqlx_session.AuthenticateContinue)
-	if len(cont.AuthData) != 20 {
-		return bugf("conn.auth: expected AuthData to has 20 bytes, got %d", len(cont.AuthData))
-	}
 
 	if err = c.writeMessage(&mysqlx_session.AuthenticateContinue{
-		AuthData: []byte(database + "\x00" + username + "\x00"),
+		AuthData: authData(database, username, password, cont.AuthData),
 	}); err != nil {
 		return c.close(err)
 	}
