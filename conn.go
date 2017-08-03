@@ -79,9 +79,27 @@ func newConn(transport net.Conn, traceF traceFunc) *conn {
 	}
 }
 
+func setDefaults(u *url.URL) error {
+	if u.Scheme == "" {
+		u.Scheme = "tcp"
+	}
+	host, port, _ := net.SplitHostPort(u.Host)
+	if host == "" {
+		host = "localhost"
+	}
+	if port == "" {
+		port = "33060"
+	}
+	u.Host = net.JoinHostPort(host, port)
+	return nil
+}
+
 func open(dataSource string) (*conn, error) {
 	u, err := url.Parse(dataSource)
 	if err != nil {
+		return nil, err
+	}
+	if err = setDefaults(u); err != nil {
 		return nil, err
 	}
 
