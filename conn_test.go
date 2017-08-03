@@ -27,4 +27,8 @@ func TestSetDefaults(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, setDefaults(u))
 	assert.Equal(t, "tcp://localhost:33060", u.String())
+
+	u, err = url.Parse("mysql:mysql")
+	require.NoError(t, err)
+	assert.EqualError(t, setDefaults(u), "invalid data source: mysql:mysql")
 }

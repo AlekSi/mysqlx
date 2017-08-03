@@ -80,6 +80,10 @@ func newConn(transport net.Conn, traceF traceFunc) *conn {
 }
 
 func setDefaults(u *url.URL) error {
+	if u.Opaque != "" {
+		return fmt.Errorf("invalid data source: %s", u.String())
+	}
+
 	if u.Scheme == "" {
 		u.Scheme = "tcp"
 	}
@@ -91,6 +95,7 @@ func setDefaults(u *url.URL) error {
 		port = "33060"
 	}
 	u.Host = net.JoinHostPort(host, port)
+
 	return nil
 }
 
