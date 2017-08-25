@@ -71,7 +71,7 @@ type ColumnType struct {
 }
 
 func openDB(t *testing.T, database string) *sql.DB {
-	// t.Helper()  TODO enable when Go 1.9 is released
+	t.Helper()
 	setTestTracef(t.Name(), t.Logf)
 
 	ds := os.Getenv("MYSQLX_TEST_DATASOURCE")
