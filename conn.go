@@ -166,10 +166,10 @@ func open(dataSource string) (*conn, error) {
 }
 
 func (c *conn) negotiate() error {
-	if err := c.writeMessage(&mysqlx_connection.CapabilitiesGet{}); err != nil {
+	if err := c.writeMessage(context.TODO(), &mysqlx_connection.CapabilitiesGet{}); err != nil {
 		return c.close(err)
 	}
-	m, err := c.readMessage()
+	m, err := c.readMessage(context.TODO())
 	if err != nil {
 		return c.close(err)
 	}
@@ -198,30 +198,30 @@ func (c *conn) auth(database, username, password string) error {
 	// TODO use password
 
 	mechName := "MYSQL41"
-	if err := c.writeMessage(&mysqlx_session.AuthenticateStart{
+	if err := c.writeMessage(context.TODO(), &mysqlx_session.AuthenticateStart{
 		MechName: &mechName,
 	}); err != nil {
 		return c.close(err)
 	}
 
-	m, err := c.readMessage()
+	m, err := c.readMessage(context.TODO())
 	if err != nil {
 		return c.close(err)
 	}
 	cont := m.(*mysqlx_session.AuthenticateContinue)
 
-	if err = c.writeMessage(&mysqlx_session.AuthenticateContinue{
+	if err = c.writeMessage(context.TODO(), &mysqlx_session.AuthenticateContinue{
 		AuthData: authData(database, username, password, cont.AuthData),
 	}); err != nil {
 		return c.close(err)
 	}
 
-	if m, err = c.readMessage(); err != nil {
+	if m, err = c.readMessage(context.TODO()); err != nil {
 		return c.close(err)
 	}
 	_ = m.(*mysqlx_notice.SessionStateChanged)
 
-	if m, err = c.readMessage(); err != nil {
+	if m, err = c.readMessage(context.TODO()); err != nil {
 		return c.close(err)
 	}
 	_ = m.(*mysqlx_session.AuthenticateOk)
@@ -247,12 +247,12 @@ func (c *conn) close(err error) error {
 // Because the sql package maintains a free pool of connections and only calls Close when there's
 // a surplus of idle connections, it shouldn't be necessary for drivers to do their own connection caching.
 func (c *conn) Close() error {
-	if err := c.writeMessage(&mysqlx_connection.Close{}); err != nil {
+	if err := c.writeMessage(context.TODO(), &mysqlx_connection.Close{}); err != nil {
 		return c.close(err)
 	}
 
 	// read one next message, but do not check it is mysqlx.Ok
-	if _, err := c.readMessage(); err != nil {
+	if _, err := c.readMessage(context.TODO()); err != nil {
 		return c.close(err)
 	}
 
@@ -290,13 +290,13 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 		stmt.Args = append(stmt.Args, a)
 	}
 
-	if err := c.writeMessage(stmt); err != nil {
+	if err := c.writeMessage(context.TODO(), stmt); err != nil {
 		return nil, c.close(err)
 	}
 
 	var result driver.Result = driver.ResultNoRows
 	for {
-		m, err := c.readMessage()
+		m, err := c.readMessage(context.TODO())
 		if err != nil {
 			return nil, c.close(err)
 		}
@@ -364,7 +364,7 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 		stmt.Args = append(stmt.Args, a)
 	}
 
-	if err := c.writeMessage(stmt); err != nil {
+	if err := c.writeMessage(context.TODO(), stmt); err != nil {
 		return nil, c.close(err)
 	}
 
@@ -374,7 +374,7 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 		rows:    make(chan *mysqlx_resultset.Row, rowsCap),
 	}
 	for {
-		m, err := c.readMessage()
+		m, err := c.readMessage(context.TODO())
 		if err != nil {
 			return nil, c.close(err)
 		}
@@ -429,7 +429,12 @@ func (c *conn) Ping(ctx context.Context) error {
 	return nil
 }
 
-func (c *conn) writeMessage(m proto.Message) error {
+func (c *conn) writeMessage(ctx context.Context, m proto.Message) error {
+	deadline, _ := ctx.Deadline()
+	if err := c.transport.SetWriteDeadline(deadline); err != nil {
+		return err
+	}
+
 	b, err := proto.Marshal(m)
 	if err != nil {
 		return err
@@ -463,7 +468,12 @@ func (c *conn) writeMessage(m proto.Message) error {
 	return err
 }
 
-func (c *conn) readMessage() (proto.Message, error) {
+func (c *conn) readMessage(ctx context.Context) (proto.Message, error) {
+	deadline, _ := ctx.Deadline()
+	if err := c.transport.SetReadDeadline(deadline); err != nil {
+		return nil, err
+	}
+
 	var head [5]byte
 	if _, err := io.ReadFull(c.transport, head[:]); err != nil {
 		return nil, err
@@ -531,7 +541,7 @@ func (c *conn) readMessage() (proto.Message, error) {
 
 			// TODO expose warnings?
 			c.tracef("<== %T %v: %T %v", f, f, m, m)
-			return c.readMessage()
+			return c.readMessage(ctx)
 		case 2:
 			m = new(mysqlx_notice.SessionVariableChanged)
 			if err := proto.Unmarshal(f.Payload, m); err != nil {

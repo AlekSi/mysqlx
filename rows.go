@@ -1,6 +1,7 @@
 package mysqlx
 
 import (
+	"context"
 	"database/sql/driver"
 	"io"
 	"math"
@@ -23,7 +24,7 @@ func (r *rows) runReader() {
 	defer close(r.rows)
 
 	for {
-		m, err := r.c.readMessage()
+		m, err := r.c.readMessage(context.TODO())
 		if err != nil {
 			r.readErr = err
 			return
