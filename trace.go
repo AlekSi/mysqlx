@@ -12,19 +12,19 @@ import (
 //    and there is no better way to do it.
 
 // Trace function signature.
-type traceFunc func(format string, v ...interface{})
+type TraceFunc func(format string, v ...interface{})
 
 // noTrace is a trace functions which does nothing.
 // TODO check it is inlined and eliminated by compiler.
 func noTrace(string, ...interface{}) {}
 
 var (
-	traceFuncs   = make(map[string]traceFunc)
+	traceFuncs   = make(map[string]TraceFunc)
 	traceFuncsRW sync.RWMutex
 )
 
 // getTracef returns trace function of logger with given prefix, creating it if required.
-func getTracef(prefix string) traceFunc {
+func getTracef(prefix string) TraceFunc {
 	traceFuncsRW.RLock()
 	tracef := traceFuncs[prefix]
 	traceFuncsRW.RUnlock()
@@ -40,7 +40,7 @@ func getTracef(prefix string) traceFunc {
 }
 
 // setTestTracef sets trace function. Used only in tests with t.Logf.
-func setTestTracef(prefix string, tracef traceFunc) {
+func setTestTracef(prefix string, tracef TraceFunc) {
 	traceFuncsRW.Lock()
 	traceFuncs[prefix] = tracef
 	traceFuncsRW.Unlock()

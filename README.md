@@ -9,9 +9,19 @@
 **Also IT'S NOT OPEN SOURCE YET – there is no OSS license.**
 Please wait for it.
 
+* https://dev.mysql.com/worklog/task/?id=8338
 * https://dev.mysql.com/worklog/task/?id=8639
+* https://dev.mysql.com/worklog/task/?id=10237
 * https://dev.mysql.com/doc/internals/en/x-protocol.html
 * https://dev.mysql.com/doc/dev/mysql-server/latest/PAGE_PROTOCOL.html
+* https://dev.mysql.com/doc/refman/5.5/en/x-plugin.html
+* https://dev.mysql.com/doc/refman/5.7/en/x-plugin.html
+* https://dev.mysql.com/doc/refman/8.0/en/x-plugin.html
+
+## Datasource parameters
+
+* `_trace`
+* `_open_timeout`
 
 ## TODO
 * Binary strings.

@@ -20,11 +20,11 @@ type rows struct {
 }
 
 // runReader reads rows and sends then to channel until all rows are read or error is encountered.
-func (r *rows) runReader() {
+func (r *rows) runReader(ctx context.Context) {
 	defer close(r.rows)
 
 	for {
-		m, err := r.c.readMessage(context.TODO())
+		m, err := r.c.readMessage(ctx)
 		if err != nil {
 			r.readErr = err
 			return

@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 
@@ -64,13 +65,13 @@ func authData(database, username, password string, authData []byte) []byte {
 // conn is assumed to be stateful.
 type conn struct {
 	transport net.Conn
-	tracef    traceFunc
+	tracef    TraceFunc
 
 	closeOnce sync.Once
 	closeErr  error
 }
 
-func newConn(transport net.Conn, traceF traceFunc) *conn {
+func newConn(transport net.Conn, traceF TraceFunc) *conn {
 	traceF("+++ connection created: %s->%s", transport.LocalAddr(), transport.RemoteAddr())
 
 	return &conn{
@@ -99,7 +100,7 @@ func setDefaults(u *url.URL) error {
 	return nil
 }
 
-func open(dataSource string) (*conn, error) {
+func open(ctx context.Context, dataSource string, openParams *OpenParams) (*conn, error) {
 	u, err := url.Parse(dataSource)
 	if err != nil {
 		return nil, err
@@ -111,7 +112,7 @@ func open(dataSource string) (*conn, error) {
 	// check and handle parameters, extract session variables
 	params := u.Query()
 	vars := make(map[string]string, len(params))
-	traceF := noTrace
+	traceF := openParams.Trace
 	for k, vs := range params {
 		if len(vs) != 1 {
 			return nil, fmt.Errorf("%d values for parameter %q", len(vs), k)
@@ -126,12 +127,20 @@ func open(dataSource string) (*conn, error) {
 		switch k {
 		case "_trace":
 			traceF = getTracef(v)
+		case "_open_timeout":
+			d, err := time.ParseDuration(v)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse %s: %s", k, err)
+			}
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, d)
+			defer cancel()
 		default:
 			return nil, fmt.Errorf("unexpected parameter %q", k)
 		}
 	}
 
-	conn, err := net.Dial(u.Scheme, u.Host)
+	conn, err := openParams.Dialer.DialContext(ctx, u.Scheme, u.Host)
 	if err != nil {
 		return nil, err
 	}
@@ -143,10 +152,10 @@ func open(dataSource string) (*conn, error) {
 		username = u.User.Username()
 		password, _ = u.User.Password()
 	}
-	if err = c.negotiate(); err != nil {
+	if err = c.negotiate(ctx); err != nil {
 		return nil, err
 	}
-	if err = c.auth(database, username, password); err != nil {
+	if err = c.auth(ctx, database, username, password); err != nil {
 		return nil, err
 	}
 
@@ -157,7 +166,11 @@ func open(dataSource string) (*conn, error) {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		if _, err = c.Exec("SET SESSION "+k+" = ?", []driver.Value{vars[k]}); err != nil {
+		nv := []driver.NamedValue{{
+			Ordinal: 1,
+			Value:   vars[k],
+		}}
+		if _, err = c.ExecContext(ctx, "SET SESSION "+k+" = ?", nv); err != nil {
 			return nil, err
 		}
 	}
@@ -165,11 +178,11 @@ func open(dataSource string) (*conn, error) {
 	return c, nil
 }
 
-func (c *conn) negotiate() error {
-	if err := c.writeMessage(context.TODO(), &mysqlx_connection.CapabilitiesGet{}); err != nil {
+func (c *conn) negotiate(ctx context.Context) error {
+	if err := c.writeMessage(ctx, &mysqlx_connection.CapabilitiesGet{}); err != nil {
 		return c.close(err)
 	}
-	m, err := c.readMessage(context.TODO())
+	m, err := c.readMessage(ctx)
 	if err != nil {
 		return c.close(err)
 	}
@@ -194,34 +207,34 @@ func (c *conn) negotiate() error {
 	return nil
 }
 
-func (c *conn) auth(database, username, password string) error {
+func (c *conn) auth(ctx context.Context, database, username, password string) error {
 	// TODO use password
 
 	mechName := "MYSQL41"
-	if err := c.writeMessage(context.TODO(), &mysqlx_session.AuthenticateStart{
+	if err := c.writeMessage(ctx, &mysqlx_session.AuthenticateStart{
 		MechName: &mechName,
 	}); err != nil {
 		return c.close(err)
 	}
 
-	m, err := c.readMessage(context.TODO())
+	m, err := c.readMessage(ctx)
 	if err != nil {
 		return c.close(err)
 	}
 	cont := m.(*mysqlx_session.AuthenticateContinue)
 
-	if err = c.writeMessage(context.TODO(), &mysqlx_session.AuthenticateContinue{
+	if err = c.writeMessage(ctx, &mysqlx_session.AuthenticateContinue{
 		AuthData: authData(database, username, password, cont.AuthData),
 	}); err != nil {
 		return c.close(err)
 	}
 
-	if m, err = c.readMessage(context.TODO()); err != nil {
+	if m, err = c.readMessage(ctx); err != nil {
 		return c.close(err)
 	}
 	_ = m.(*mysqlx_notice.SessionStateChanged)
 
-	if m, err = c.readMessage(context.TODO()); err != nil {
+	if m, err = c.readMessage(ctx); err != nil {
 		return c.close(err)
 	}
 	_ = m.(*mysqlx_session.AuthenticateOk)
@@ -463,7 +476,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 		// query with rows
 		case *mysqlx_resultset.Row:
 			rows.rows <- m
-			go rows.runReader()
+			go rows.runReader(ctx)
 			return &rows, nil
 
 		// query without rows
