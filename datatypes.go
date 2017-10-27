@@ -38,8 +38,7 @@ func unmarshalDecimal(value []byte) string {
 	case 0xc0:
 		return s
 	default:
-		bugf("unmarshalDecimal: failed to parse decimal %#v", value)
-		return ""
+		return bugf("unmarshalDecimal: failed to parse decimal %#v", value).Error()
 	}
 }
 

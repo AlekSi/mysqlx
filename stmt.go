@@ -1,6 +1,7 @@
 package mysqlx
 
 import (
+	"context"
 	"database/sql/driver"
 )
 
@@ -33,18 +34,30 @@ func (s *stmt) Exec(args []driver.Value) (driver.Result, error) {
 	return s.c.Exec(s.query, args)
 }
 
+// ExecContext executes a query that doesn't return rows, such as an INSERT or UPDATE.
+// It honors the context timeout and return when it is canceled.
+func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
+	return s.c.ExecContext(ctx, s.query, args)
+}
+
 // Query executes a query that may return rows, such as a SELECT.
 func (s *stmt) Query(args []driver.Value) (driver.Rows, error) {
 	return s.c.Query(s.query, args)
 }
 
+// Query executes a query that may return rows, such as a SELECT.
+// It honors the context timeout and return when it is canceled.
+func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	return s.c.QueryContext(ctx, s.query, args)
+}
+
 // check interfaces
 var (
-	_ driver.Stmt = (*stmt)(nil)
+	_ driver.Stmt             = (*stmt)(nil)
+	_ driver.StmtExecContext  = (*stmt)(nil)
+	_ driver.StmtQueryContext = (*stmt)(nil)
 
 	// TODO
 	// _ driver.ColumnConverter = (*stmt)(nil)
 	// _ driver.NamedValueChecker = (*stmt)(nil)
-	// _ driver.StmtExecContext   = (*stmt)(nil)
-	// _ driver.StmtQueryContext  = (*stmt)(nil)
 )

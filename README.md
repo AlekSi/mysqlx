@@ -24,4 +24,5 @@ Please wait for it.
 * Charsets.
 * Time zones.
 * Real prepared statements.
+* Named values.
 * MUCH MORE.

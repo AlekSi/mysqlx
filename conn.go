@@ -46,8 +46,7 @@ func scramble(data []byte, password string) []byte {
 
 func authData(database, username, password string, authData []byte) []byte {
 	if len(authData) != 20 {
-		bugf("authData: expected authData to has 20 bytes, got %d", len(authData))
-		return nil
+		return []byte(bugf("authData: expected authData to has 20 bytes, got %d", len(authData)).Error())
 	}
 
 	res := database + "\x00" + username + "\x00"
@@ -279,24 +278,43 @@ func (c *conn) Prepare(query string) (driver.Stmt, error) {
 
 // Exec executes a query that doesn't return rows, such as an INSERT or UPDATE.
 func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
+	nv := make([]driver.NamedValue, len(args))
+	for i, arg := range args {
+		nv[i] = driver.NamedValue{
+			Ordinal: i + 1,
+			Value:   arg,
+		}
+	}
+	return c.ExecContext(context.Background(), query, nv)
+}
+
+// ExecContext executes a query that doesn't return rows, such as an INSERT or UPDATE.
+// It honors the context timeout and return when the context is canceled.
+func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	stmt := &mysqlx_sql.StmtExecute{
 		Stmt: []byte(query),
 	}
-	for _, arg := range args {
-		a, err := marshalValue(arg)
+	for i, nv := range args {
+		if nv.Name != "" {
+			return nil, bugf("conn.ExecContext: %q - named values are not supported yet", nv.Name)
+		}
+		if nv.Ordinal != i+1 {
+			return nil, bugf("conn.ExecContext: out-of-order values are not supported yet")
+		}
+		a, err := marshalValue(nv.Value)
 		if err != nil {
 			return nil, err
 		}
 		stmt.Args = append(stmt.Args, a)
 	}
 
-	if err := c.writeMessage(context.TODO(), stmt); err != nil {
+	if err := c.writeMessage(ctx, stmt); err != nil {
 		return nil, c.close(err)
 	}
 
 	var result driver.Result = driver.ResultNoRows
 	for {
-		m, err := c.readMessage(context.TODO())
+		m, err := c.readMessage(ctx)
 		if err != nil {
 			return nil, c.close(err)
 		}
@@ -353,18 +371,37 @@ func (c *conn) Exec(query string, args []driver.Value) (driver.Result, error) {
 
 // Query executes a query that may return rows, such as a SELECT.
 func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
+	nv := make([]driver.NamedValue, len(args))
+	for i, arg := range args {
+		nv[i] = driver.NamedValue{
+			Ordinal: i + 1,
+			Value:   arg,
+		}
+	}
+	return c.QueryContext(context.Background(), query, nv)
+}
+
+// QueryContext executes a query that may return rows, such as a SELECT.
+// It honors the context timeout and return when the context is canceled.
+func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	stmt := &mysqlx_sql.StmtExecute{
 		Stmt: []byte(query),
 	}
-	for _, arg := range args {
-		a, err := marshalValue(arg)
+	for i, nv := range args {
+		if nv.Name != "" {
+			return nil, bugf("conn.ExecContext: %q - named values are not supported yet", nv.Name)
+		}
+		if nv.Ordinal != i+1 {
+			return nil, bugf("conn.ExecContext: out-of-order values are not supported yet")
+		}
+		a, err := marshalValue(nv.Value)
 		if err != nil {
 			return nil, err
 		}
 		stmt.Args = append(stmt.Args, a)
 	}
 
-	if err := c.writeMessage(context.TODO(), stmt); err != nil {
+	if err := c.writeMessage(ctx, stmt); err != nil {
 		return nil, c.close(err)
 	}
 
@@ -374,7 +411,7 @@ func (c *conn) Query(query string, args []driver.Value) (driver.Rows, error) {
 		rows:    make(chan *mysqlx_resultset.Row, rowsCap),
 	}
 	for {
-		m, err := c.readMessage(context.TODO())
+		m, err := c.readMessage(ctx)
 		if err != nil {
 			return nil, c.close(err)
 		}
@@ -567,15 +604,15 @@ func (c *conn) readMessage(ctx context.Context) (proto.Message, error) {
 
 // check interfaces
 var (
-	_ driver.Conn    = (*conn)(nil)
-	_ driver.Execer  = (*conn)(nil)
-	_ driver.Queryer = (*conn)(nil)
-	_ driver.Pinger  = (*conn)(nil)
+	_ driver.Conn           = (*conn)(nil)
+	_ driver.Execer         = (*conn)(nil)
+	_ driver.ExecerContext  = (*conn)(nil)
+	_ driver.Queryer        = (*conn)(nil)
+	_ driver.QueryerContext = (*conn)(nil)
+	_ driver.Pinger         = (*conn)(nil)
 
 	// TODO
 	// _ driver.ConnBeginTx        = (*conn)(nil)
 	// _ driver.ConnPrepareContext = (*conn)(nil)
-	// _ driver.ExecerContext      = (*conn)(nil)
 	// _ driver.NamedValueChecker  = (*conn)(nil)
-	// _ driver.QueryerContext     = (*conn)(nil)
 )
