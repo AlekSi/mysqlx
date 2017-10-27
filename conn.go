@@ -3,6 +3,7 @@ package mysqlx
 import (
 	"context"
 	"crypto/sha1"
+	"database/sql"
 	"database/sql/driver"
 	"encoding/binary"
 	"fmt"
@@ -268,8 +269,35 @@ func (c *conn) Begin() (driver.Tx, error) {
 	}, nil
 }
 
+// BeginTx starts and returns a new transaction.
+// If the context is canceled by the user the sql package will
+// call Tx.Rollback before discarding and closing the connection.
+func (c *conn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	if sql.IsolationLevel(opts.Isolation) != sql.LevelDefault {
+		return nil, bugf("conn.BeginTx: isolation level %d is not supported yet", opts.Isolation)
+	}
+	if opts.ReadOnly {
+		return nil, bugf("conn.BeginTx: read-only transactions are not supported yet")
+	}
+	if _, err := c.ExecContext(ctx, "BEGIN", nil); err != nil {
+		return nil, err
+	}
+	return &tx{
+		c: c,
+	}, nil
+}
+
 // Prepare returns a prepared statement, bound to this connection.
 func (c *conn) Prepare(query string) (driver.Stmt, error) {
+	return &stmt{
+		c:     c,
+		query: query,
+	}, nil
+}
+
+// PrepareContext returns a prepared statement, bound to this connection.
+// context is for the preparation of the statement (and so ignored).
+func (c *conn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
 	return &stmt{
 		c:     c,
 		query: query,
@@ -459,8 +487,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 }
 
 func (c *conn) Ping(ctx context.Context) error {
-	// TODO use context
-	if _, err := c.Exec("SELECT 'ping'", nil); err != nil {
+	if _, err := c.ExecContext(ctx, "SELECT 'ping'", nil); err != nil {
 		return driver.ErrBadConn
 	}
 	return nil
@@ -604,15 +631,15 @@ func (c *conn) readMessage(ctx context.Context) (proto.Message, error) {
 
 // check interfaces
 var (
-	_ driver.Conn           = (*conn)(nil)
-	_ driver.Execer         = (*conn)(nil)
-	_ driver.ExecerContext  = (*conn)(nil)
-	_ driver.Queryer        = (*conn)(nil)
-	_ driver.QueryerContext = (*conn)(nil)
-	_ driver.Pinger         = (*conn)(nil)
+	_ driver.Conn               = (*conn)(nil)
+	_ driver.ConnBeginTx        = (*conn)(nil)
+	_ driver.ConnPrepareContext = (*conn)(nil)
+	_ driver.Execer             = (*conn)(nil)
+	_ driver.ExecerContext      = (*conn)(nil)
+	_ driver.Queryer            = (*conn)(nil)
+	_ driver.QueryerContext     = (*conn)(nil)
+	_ driver.Pinger             = (*conn)(nil)
 
 	// TODO
-	// _ driver.ConnBeginTx        = (*conn)(nil)
-	// _ driver.ConnPrepareContext = (*conn)(nil)
 	// _ driver.NamedValueChecker  = (*conn)(nil)
 )
