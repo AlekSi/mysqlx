@@ -1,0 +1,4 @@
+go-fuzz/
+*.pem
+*.txt
+*.zip

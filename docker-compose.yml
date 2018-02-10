@@ -1,0 +1,25 @@
+---
+version: '3'
+
+services:
+  test_db:
+    image: aleksi/test_db
+    volumes:
+      - test_db:/test_db:ro
+
+  mysql:
+    image: ${MYSQL_IMAGE:-mysql/mysql-server:5.7}
+    command: --plugin-load=mysqlx=mysqlx.so
+    environment:
+      - MYSQL_ALLOW_EMPTY_PASSWORD=yes
+      - MYSQL_USER=my_user
+      - MYSQL_PASSWORD=my_password
+      - MYSQL_ROOT_HOST=%
+    ports:
+      - 127.0.0.1:3306:3306
+      - 127.0.0.1:33060:33060
+    volumes:
+      - test_db:/test_db:ro
+
+volumes:
+  test_db:

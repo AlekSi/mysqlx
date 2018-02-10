@@ -1,0 +1,37 @@
+dist: trusty
+sudo: required
+language: go
+
+go:
+  - 1.9.x
+  - master
+
+go_import_path: github.com/AlekSi/mysqlx
+
+env:
+  matrix:
+    - MYSQL_IMAGE=mysql/mysql-server:5.7 MYSQLX_TEST_DATASOURCE='mysqlx://my_user:my_password@127.0.0.1:33060/?_auth-method=PLAIN&time_zone=UTC'
+    - MYSQL_IMAGE=mysql/mysql-server:8.0 MYSQLX_TEST_DATASOURCE='mysqlx://my_user:my_password@127.0.0.1:33060/?_auth-method=PLAIN&time_zone=UTC'
+
+services:
+  - docker
+
+before_install:
+  - sudo /etc/init.d/mysql stop
+
+install:
+  - go get -v -t
+
+before_script:
+  - docker --version
+  - docker-compose --version
+  - docker-compose up -d
+
+script:
+  - make build
+  - go run -v internal/wait.go
+  - make seed
+  - make cover
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash) -X fix
