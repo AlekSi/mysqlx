@@ -156,6 +156,16 @@ func marshalValue(value driver.Value) (*mysqlx_datatypes.Any, error) {
 	// Due to conn.CheckNamedValue passing on everything, value there can be of any type, not only of the one of
 	// standard driver.Value types. We should handle everything ourselves.
 
+	v := reflect.ValueOf(value)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+		if v.IsValid() {
+			value = v.Interface()
+		} else {
+			value = nil
+		}
+	}
+
 	// nil -> NULL
 	if value == nil {
 		return &mysqlx_datatypes.Any{

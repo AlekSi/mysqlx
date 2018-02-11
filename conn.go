@@ -522,6 +522,10 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 				Msg:      m.GetMsg(),
 			}
 
+		case *mysqlx_notice.Warning:
+			// TODO expose warnings?
+			continue
+
 		case *mysqlx_resultset.ColumnMetaData:
 			continue
 
