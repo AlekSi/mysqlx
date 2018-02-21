@@ -3,7 +3,7 @@ sudo: required
 language: go
 
 go:
-  - 1.9.x
+  - "1.10"
   - master
 
 go_import_path: github.com/AlekSi/mysqlx
