@@ -7,6 +7,8 @@ MySQL driver for Go's (golang) `database/sql` package and MySQL X Protocol.
 [![Codecov](https://codecov.io/gh/AlekSi/mysqlx/branch/master/graph/badge.svg)](https://codecov.io/gh/AlekSi/mysqlx)
 [![Go Report Card](https://goreportcard.com/badge/github.com/AlekSi/mysqlx)](https://goreportcard.com/report/github.com/AlekSi/mysqlx)
 
+It requires Go 1.10+.
+
 **Experimental work in progress, do not use in production.**
 
 * https://dev.mysql.com/worklog/task/?id=8338
