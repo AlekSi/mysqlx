@@ -21,7 +21,15 @@ var Driver driverType
 
 // Open returns a new connection to the database. See README for dataSource format.
 // The returned connection may be used only by one goroutine at a time.
-func (driverType) Open(dataSource string) (driver.Conn, error) {
+func (d driverType) Open(dataSource string) (driver.Conn, error) {
+	ds, err := d.OpenConnector(dataSource)
+	if err != nil {
+		return nil, err
+	}
+	return open(context.Background(), ds.(*DataSource))
+}
+
+func (d driverType) OpenConnector(dataSource string) (driver.Connector, error) {
 	u, err := url.Parse(dataSource)
 	if err != nil {
 		return nil, err
@@ -30,22 +38,8 @@ func (driverType) Open(dataSource string) (driver.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return open(context.Background(), ds)
+	return ds, nil
 }
-
-/*
-// OpenCtx is a variant of Open with specified context and DataSource struct.
-// Context is used only for connection establishing: dialing, negotiating
-// and authenticating. Canceling the context after the connection is established does nothing.
-func (driverType) OpenCtx(ctx context.Context, dataSource *DataSource) (driver.Conn, error) {
-	return open(ctx, dataSource)
-}
-*/
-
-// TODO
-// func (Driver) OpenConnector(name string) (driver.Connector, error) {
-// 	return nil, nil
-// }
 
 func init() {
 	sql.Register("mysqlx", Driver)
@@ -53,6 +47,6 @@ func init() {
 
 // check interfaces
 var (
-	_ driver.Driver = Driver
-	// TODO _ driver.DriverContext = Driver
+	_ driver.Driver        = Driver
+	_ driver.DriverContext = Driver
 )

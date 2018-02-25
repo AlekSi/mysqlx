@@ -138,5 +138,5 @@ func (ds *DataSource) URL() *url.URL {
 
 // check interfaces
 var (
-// TODO _ driver.Connector = (*Connector)(nil)
+	_ driver.Connector = (*DataSource)(nil)
 )

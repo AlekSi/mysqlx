@@ -831,7 +831,5 @@ var (
 	_ driver.QueryerContext     = (*conn)(nil)
 	_ driver.Pinger             = (*conn)(nil)
 	_ driver.NamedValueChecker  = (*conn)(nil)
-
-	// TODO
-	// _ driver.Connector = (*conn)(nil)
+	// _ driver.Connector          = (*conn)(nil)
 )
