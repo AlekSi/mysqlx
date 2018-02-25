@@ -53,7 +53,11 @@ func (ds *DataSource) Driver() driver.Driver {
 	return Driver
 }
 
-func ParseDataSource(u *url.URL) (*DataSource, error) {
+func ParseDataSource(dataSource string) (*DataSource, error) {
+	u, err := url.Parse(dataSource)
+	if err != nil {
+		return nil, err
+	}
 	if u.Scheme != "mysqlx" {
 		return nil, fmt.Errorf("unexpected scheme %s", u.Scheme)
 	}

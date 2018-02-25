@@ -11,7 +11,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"net/url"
 )
 
 // driverType implements database/sql/driver.Driver interface.
@@ -30,11 +29,7 @@ func (d driverType) Open(dataSource string) (driver.Conn, error) {
 }
 
 func (d driverType) OpenConnector(dataSource string) (driver.Connector, error) {
-	u, err := url.Parse(dataSource)
-	if err != nil {
-		return nil, err
-	}
-	ds, err := ParseDataSource(u)
+	ds, err := ParseDataSource(dataSource)
 	if err != nil {
 		return nil, err
 	}

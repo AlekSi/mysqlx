@@ -12,7 +12,6 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
-	"net/url"
 	"os"
 	"reflect"
 	"testing"
@@ -85,9 +84,7 @@ func dataSource(t *testing.T, database string) *DataSource {
 
 	env := os.Getenv("MYSQLX_TEST_DATASOURCE")
 	require.NotEmpty(t, env, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
-	u, err := url.Parse(env)
-	require.NoError(t, err)
-	ds, err := ParseDataSource(u)
+	ds, err := ParseDataSource(env)
 	require.NoError(t, err)
 	ds.Database = database
 	ds.Trace = t.Logf

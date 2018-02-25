@@ -8,7 +8,6 @@
 package mysqlx
 
 import (
-	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,13 +30,11 @@ func TestParseDataSource(t *testing.T) {
 		t.Run(s, func(t *testing.T) {
 			t.Parallel()
 
-			u, err := url.Parse(s)
-			require.NoError(t, err)
-			actual, err := ParseDataSource(u)
+			actual, err := ParseDataSource(s)
 			require.NoError(t, err)
 			actual.Trace = nil // "Func values are deeply equal if both are nil; otherwise they are not deeply equal."
 			assert.Equal(t, expected, actual)
-			assert.Equal(t, u, actual.URL())
+			assert.Equal(t, s, actual.URL().String())
 		})
 	}
 }
