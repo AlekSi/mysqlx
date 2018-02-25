@@ -32,7 +32,6 @@ func TestParseDataSource(t *testing.T) {
 
 			actual, err := ParseDataSource(dataSource)
 			require.NoError(t, err)
-			actual.Trace = nil // "Func values are deeply equal if both are nil; otherwise they are not deeply equal."
 			assert.Equal(t, expected, actual)
 			assert.Equal(t, dataSource, actual.URL().String())
 		})

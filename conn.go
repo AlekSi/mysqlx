@@ -79,6 +79,10 @@ type conn struct {
 }
 
 func newConn(transport net.Conn, traceF TraceFunc) *conn {
+	if traceF == nil {
+		traceF = noTrace
+	}
+
 	local, remote := transport.LocalAddr().String(), transport.RemoteAddr().String()
 	traceF("+++ connection created: %s->%s", local, remote)
 	connectionCreated(local, remote)

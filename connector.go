@@ -24,12 +24,11 @@ const (
 	AuthMySQL41 AuthMethod = "MYSQL41"
 )
 
+// noTrace is a trace functions which does nothing.
+func noTrace(string, ...interface{}) {}
+
 // Trace function signature.
 type TraceFunc func(format string, v ...interface{})
-
-// noTrace is a trace functions which does nothing.
-// TODO check it is inlined and eliminated by compiler.
-func noTrace(string, ...interface{}) {}
 
 type Connector struct {
 	Host     string
@@ -64,7 +63,6 @@ func ParseDataSource(dataSource string) (*Connector, error) {
 	connector := &Connector{
 		Host:     u.Hostname(),
 		Database: strings.TrimPrefix(u.Path, "/"),
-		Trace:    noTrace,
 	}
 
 	// set port if given
