@@ -245,7 +245,7 @@ func (c *conn) authSHA256(ctx context.Context, database, username, password stri
 
 	case *mysqlx_notice.SessionStateChanged:
 	default:
-		bugf("conn.authSHA256: unhandled type %T", m)
+		return bugf("conn.authSHA256: unhandled type %T", m)
 	}
 
 	if m, err = c.readMessage(ctx); err != nil {
@@ -294,7 +294,7 @@ func (c *conn) authMySQL41(ctx context.Context, database, username, password str
 
 	case *mysqlx_notice.SessionStateChanged:
 	default:
-		bugf("conn.authMySQL41: unhandled type %T", m)
+		return bugf("conn.authMySQL41: unhandled type %T", m)
 	}
 
 	if m, err = c.readMessage(ctx); err != nil {
@@ -330,7 +330,7 @@ func (c *conn) authPlain(ctx context.Context, database, username, password strin
 
 	case *mysqlx_notice.SessionStateChanged:
 	default:
-		bugf("conn.authPlain: unhandled type %T", m)
+		return bugf("conn.authPlain: unhandled type %T", m)
 	}
 
 	if m, err = c.readMessage(ctx); err != nil {
@@ -339,7 +339,7 @@ func (c *conn) authPlain(ctx context.Context, database, username, password strin
 	switch m := m.(type) {
 	case *mysqlx_session.AuthenticateOk:
 	default:
-		bugf("conn.authPlain: unhandled type %T", m)
+		return bugf("conn.authPlain: unhandled type %T", m)
 	}
 
 	return nil
@@ -532,13 +532,13 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 				// TODO log it?
 				continue
 			default:
-				return nil, bugf("conn.Exec: unhandled session state change %v", m)
+				return nil, bugf("conn.ExecContext: unhandled session state change %v", m)
 			}
 		case *mysqlx_sql.StmtExecuteOk:
 			return result, nil
 
 		default:
-			return nil, bugf("conn.Exec: unhandled type %T", m)
+			return nil, bugf("conn.ExecContext: unhandled type %T", m)
 		}
 	}
 }
@@ -563,10 +563,10 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	}
 	for i, nv := range args {
 		if nv.Name != "" {
-			return nil, bugf("conn.ExecContext: %q - named values are not supported yet", nv.Name)
+			return nil, bugf("conn.QueryContext: %q - named values are not supported yet", nv.Name)
 		}
 		if nv.Ordinal != i+1 {
-			return nil, bugf("conn.ExecContext: out-of-order values are not supported yet")
+			return nil, bugf("conn.QueryContext: out-of-order values are not supported yet")
 		}
 		a, err := marshalValue(nv.Value)
 		if err != nil {
@@ -620,14 +620,14 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 			case mysqlx_notice.SessionStateChanged_ROWS_AFFECTED:
 				continue
 			default:
-				return nil, bugf("conn.Query: unhandled session state change %v", m)
+				return nil, bugf("conn.QueryContext: unhandled session state change %v", m)
 			}
 		case *mysqlx_sql.StmtExecuteOk:
 			close(rows.rows)
 			return &rows, nil
 
 		default:
-			return nil, bugf("conn.Query: unhandled type %T", m)
+			return nil, bugf("conn.QueryContext: unhandled type %T", m)
 		}
 	}
 }
