@@ -9,48 +9,35 @@ MySQL driver for Go's (golang) `database/sql` package and MySQL X Protocol.
 
 It requires Go 1.10+.
 
-**Experimental work in progress, do not use in production.**
+## Status
 
-* https://dev.mysql.com/worklog/task/?id=8338
-* https://dev.mysql.com/worklog/task/?id=8639
-* https://dev.mysql.com/worklog/task/?id=9271
-* https://dev.mysql.com/worklog/task/?id=10237
-* https://dev.mysql.com/worklog/task/?id=10992
-* https://dev.mysql.com/doc/internals/en/x-protocol.html
-* https://dev.mysql.com/doc/dev/mysql-server/latest/PAGE_PROTOCOL.html
-* https://dev.mysql.com/doc/refman/5.5/en/x-plugin.html
-* https://dev.mysql.com/doc/refman/5.7/en/x-plugin.html
-* https://dev.mysql.com/doc/refman/8.0/en/x-plugin.html
+**Alpha quality. Do not use in production!**
+
+You are, however, is encouraged to try it in development and report bugs.
 
 ## Data source format
 
 ```
-mysqlx://username:password@host:port/database?_param=value&session_variable=value
+mysqlx://username:password@host:port/database?_param=value&session_variable=value&…
 ```
 
-### Extra parameters
+All query parameters that are not starting with `_` are used as session variables
+and are set whenever a connection is opened.
+Parameters starting with `_` are listed below:
 
-* `_auth-method`
+* `_auth-method`: `PLAIN` or `MYSQL41` (see [AuthMethod type](https://godoc.org/github.com/AlekSi/mysqlx#AuthMethod))
 
 ## TODO
 
-* https://dev.mysql.com/doc/mysql-shell-excerpt/5.7/en/mysql-shell-connection-using-uri.html
+* Real TLS support.
 * Binary strings.
 * Large uint64.
-* Correct connection closing.
-* Concurrent tests.
+* More tests for correct connection closing.
+* More concurrent tests.
 * Benchmarks.
-* Connection string format.
-* TLS.
-* Add support for https://github.com/gogo/protobuf
+* Support for https://github.com/gogo/protobuf (?)
 * Charsets.
 * Time zones.
 * Real prepared statements.
 * Named values.
-* Expose notices and warnings.
-* MUCH MORE.
-
-```
-docker cp mysqlx_mysql_1:/var/lib/mysql/server-cert.pem internal/
-docker cp mysqlx_mysql_1:/var/lib/mysql/server-key.pem internal/
-```
+* Expose notices and warnings (?).
