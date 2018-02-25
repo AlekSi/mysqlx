@@ -653,6 +653,22 @@ func (c *conn) CheckNamedValue(arg *driver.NamedValue) error {
 	return nil
 }
 
+/*
+// ResetSession is called while a connection is in the connection
+// pool. No queries will run on this connection until this method returns.
+//
+// If the connection is bad this should return driver.ErrBadConn to prevent
+// the connection from being returned to the connection pool. Any other
+// error will be discarded.
+func (c *conn) ResetSession(ctx context.Context) error {
+	// We do not want to reset a session completely by sending mysqlx_session.Reset message,
+	// because that also reset current selected database, etc.
+	// We also do not want to ping a database in this method - that will create extra load.
+	// So, we do nothing.
+	return nil
+}
+*/
+
 // writeMessage writes one protocol message, returns low-level error if any.
 func (c *conn) writeMessage(ctx context.Context, m proto.Message) error {
 	deadline, _ := ctx.Deadline()
@@ -814,4 +830,5 @@ var (
 	_ driver.QueryerContext     = (*conn)(nil)
 	_ driver.Pinger             = (*conn)(nil)
 	_ driver.NamedValueChecker  = (*conn)(nil)
+	// _ driver.SessionResetter    = (*conn)(nil)
 )
