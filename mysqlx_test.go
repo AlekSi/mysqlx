@@ -631,3 +631,24 @@ func TestConnectionClose(t *testing.T) {
 	err = db.QueryRow("SELECT 1").Scan(&i)
 	assert.NoError(t, err)
 }
+
+func TestDriverMethods(t *testing.T) {
+	checkConn := func(conn driver.Conn) {
+		err := conn.(driver.Pinger).Ping(context.Background())
+		assert.NoError(t, err)
+		err = conn.Close()
+		assert.NoError(t, err)
+	}
+
+	connector := connector(t, "")
+	conn, err := Driver.Open(connector.URL().String())
+	require.NoError(t, err)
+	checkConn(conn)
+
+	connector2, err := Driver.OpenConnector(connector.URL().String())
+	require.NoError(t, err)
+	assert.Equal(t, Driver, connector2.Driver())
+	conn, err = connector2.Connect(context.Background())
+	require.NoError(t, err)
+	checkConn(conn)
+}
