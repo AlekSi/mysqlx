@@ -9,7 +9,6 @@ package mysqlx
 
 import (
 	"context"
-	"crypto/sha1"
 	"crypto/tls"
 	"database/sql"
 	"database/sql/driver"
@@ -35,37 +34,6 @@ import (
 // TODO make this configurable?
 // It should not be less then 1.
 const rowsCap = 1
-
-// https://github.com/mysql/mysql-server/blob/mysql-5.7.19/rapid/plugin/x/mysqlxtest_src/password_hasher.cc
-// https://github.com/mysql/mysql-server/blob/mysql-5.7.19/rapid/plugin/x/mysqlxtest_src/mysql41_hash.cc
-func scramble(password string, authData []byte) []byte {
-	hash1 := sha1.Sum([]byte(password))
-	hash2 := sha1.Sum([]byte(hash1[:]))
-
-	h := sha1.New()
-	h.Write(authData)
-	h.Write(hash2[:])
-	res := h.Sum(nil)
-
-	for i := range res {
-		res[i] ^= hash1[i]
-	}
-	return res[:]
-}
-
-func authData(database, username, password string, authData []byte) []byte {
-	if len(authData) != 20 {
-		return []byte(bugf("authData: expected authData to has 20 bytes, got %d", len(authData)).Error())
-	}
-
-	res := database + "\x00" + username + "\x00"
-	if password == "" {
-		return []byte(res)
-	}
-
-	res += fmt.Sprintf("*%X", scramble(password, authData))
-	return []byte(res)
-}
 
 // conn is a connection to a database.
 // It is not used concurrently by multiple goroutines.
@@ -252,8 +220,12 @@ func (c *conn) authSHA256(ctx context.Context, database, username, password stri
 	}
 	cont := m.(*mysqlx_session.AuthenticateContinue)
 
+	authData, err := authDataSHA256(database, username, password, cont.AuthData)
+	if err != nil {
+		return err
+	}
 	if err = c.writeMessage(ctx, &mysqlx_session.AuthenticateContinue{
-		AuthData: authDataSHA256(database, username, password, cont.AuthData),
+		AuthData: authData,
 	}); err != nil {
 		return err
 	}
@@ -297,8 +269,12 @@ func (c *conn) authMySQL41(ctx context.Context, database, username, password str
 	}
 	cont := m.(*mysqlx_session.AuthenticateContinue)
 
+	authData, err := authDataMySQL41(database, username, password, cont.AuthData)
+	if err != nil {
+		return err
+	}
 	if err = c.writeMessage(ctx, &mysqlx_session.AuthenticateContinue{
-		AuthData: authData(database, username, password, cont.AuthData),
+		AuthData: authData,
 	}); err != nil {
 		return err
 	}
