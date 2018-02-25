@@ -30,6 +30,7 @@ func noTrace(string, ...interface{}) {}
 // Trace function signature.
 type TraceFunc func(format string, v ...interface{})
 
+// It implements database/sql/driver.Connector interface.
 type Connector struct {
 	Host     string
 	Port     uint16
@@ -44,14 +45,23 @@ type Connector struct {
 	Trace TraceFunc
 }
 
+// Connect returns a new connection to the database.
+//
+// The provided context.Context is for dialing purposes only
+// (see net.DialContext) and is not used for other purposes.
+//
+// The returned connection must be used only by one goroutine at a time.
 func (connector *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	return open(ctx, connector)
 }
 
+// Driver returns the underlying Driver of the Connector,
+// mainly to maintain compatibility with the Driver method on sql.DB.
 func (connector *Connector) Driver() driver.Driver {
 	return Driver
 }
 
+// ParseDataSource returns Connector for given data source.
 func ParseDataSource(dataSource string) (*Connector, error) {
 	u, err := url.Parse(dataSource)
 	if err != nil {
@@ -118,6 +128,7 @@ func (connector *Connector) hostPort() string {
 	return net.JoinHostPort(connector.Host, strconv.FormatUint(uint64(connector.Port), 10))
 }
 
+// URL returns data source as an URL.
 func (connector *Connector) URL() *url.URL {
 	u := &url.URL{
 		Scheme: "mysqlx",

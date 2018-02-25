@@ -22,11 +22,18 @@ It requires Go 1.10+.
 * https://dev.mysql.com/doc/refman/5.7/en/x-plugin.html
 * https://dev.mysql.com/doc/refman/8.0/en/x-plugin.html
 
-## Datasource parameters
+## Data source format
+
+```
+mysqlx://username:password@host:port/database?_param=value&session_variable=value
+```
+
+### Extra parameters
 
 * `_auth-method`
 
 ## TODO
+
 * https://dev.mysql.com/doc/mysql-shell-excerpt/5.7/en/mysql-shell-connection-using-uri.html
 * Binary strings.
 * Large uint64.

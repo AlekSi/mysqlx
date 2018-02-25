@@ -56,8 +56,8 @@ type Error struct {
 	Msg      string
 }
 
+// Error returns error string in a formal similar to mysql and mysqlsh client programs.
 func (e *Error) Error() string {
-	// format of mysql and mysqlsh client programs
 	return fmt.Sprintf("%s %d (%s): %s", e.Severity, e.Code, e.SQLState, e.Msg)
 }
 
