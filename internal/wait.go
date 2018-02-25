@@ -14,7 +14,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"time"
 
@@ -31,22 +30,18 @@ func main() {
 	flag.Parse()
 	log.SetFlags(log.Lmicroseconds)
 
-	ds := os.Getenv("MYSQLX_TEST_DATASOURCE")
-	if ds == "" {
+	dataSource := os.Getenv("MYSQLX_TEST_DATASOURCE")
+	if dataSource == "" {
 		log.Fatal("Please set environment variable MYSQLX_TEST_DATASOURCE.")
 	}
-	u, err := url.Parse(ds)
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	log.Printf("Connecting to %s ...", u)
+	log.Printf("Connecting to %s ...", dataSource)
 	start := time.Now()
 	var prevErr error
 	var attempts int
 	for {
 		attempts++
-		db, err := sql.Open("mysqlx", u.String())
+		db, err := sql.Open("mysqlx", dataSource)
 		if err == nil {
 			err = db.Ping()
 		}

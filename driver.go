@@ -13,27 +13,28 @@ import (
 	"database/sql/driver"
 )
 
-// driverType implements database/sql/driver.Driver interface.
 type driverType struct{}
 
+// Driver implements database/sql/driver.Driver interface.
+// It has no internal state.
 var Driver driverType
 
 // Open returns a new connection to the database. See README for dataSource format.
-// The returned connection may be used only by one goroutine at a time.
+// The returned connection must be used only by one goroutine at a time.
 func (d driverType) Open(dataSource string) (driver.Conn, error) {
-	ds, err := d.OpenConnector(dataSource)
+	connector, err := d.OpenConnector(dataSource)
 	if err != nil {
 		return nil, err
 	}
-	return open(context.Background(), ds.(*DataSource))
+	return open(context.Background(), connector.(*Connector))
 }
 
 func (d driverType) OpenConnector(dataSource string) (driver.Connector, error) {
-	ds, err := ParseDataSource(dataSource)
+	connector, err := ParseDataSource(dataSource)
 	if err != nil {
 		return nil, err
 	}
-	return ds, nil
+	return connector, nil
 }
 
 func init() {

@@ -89,12 +89,12 @@ func newConn(transport net.Conn, traceF TraceFunc) *conn {
 	}
 }
 
-func open(ctx context.Context, dataSource *DataSource) (*conn, error) {
-	conn, err := new(net.Dialer).DialContext(ctx, "tcp", dataSource.hostPort())
+func open(ctx context.Context, connector *Connector) (*conn, error) {
+	conn, err := new(net.Dialer).DialContext(ctx, "tcp", connector.hostPort())
 	if err != nil {
 		return nil, err
 	}
-	c := newConn(conn, dataSource.Trace)
+	c := newConn(conn, connector.Trace)
 	defer func() {
 		if err != nil {
 			c.close(err)
@@ -104,20 +104,20 @@ func open(ctx context.Context, dataSource *DataSource) (*conn, error) {
 	if err = c.negotiate(ctx); err != nil {
 		return nil, err
 	}
-	if err = c.authenticate(ctx, dataSource.AuthMethod, dataSource.Database, dataSource.Username, dataSource.Password); err != nil {
+	if err = c.authenticate(ctx, connector.AuthMethod, connector.Database, connector.Username, connector.Password); err != nil {
 		return nil, err
 	}
 
 	// set session variables
-	keys := make([]string, 0, len(dataSource.SessionVariables))
-	for k := range dataSource.SessionVariables {
+	keys := make([]string, 0, len(connector.SessionVariables))
+	for k := range connector.SessionVariables {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
 		nv := []driver.NamedValue{{
 			Ordinal: 1,
-			Value:   dataSource.SessionVariables[k],
+			Value:   connector.SessionVariables[k],
 		}}
 		if _, err = c.ExecContext(ctx, "SET SESSION "+k+" = ?", nv); err != nil {
 			return nil, err

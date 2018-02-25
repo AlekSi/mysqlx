@@ -17,7 +17,7 @@ import (
 func TestParseDataSource(t *testing.T) {
 	t.Parallel()
 
-	for s, expected := range map[string]*DataSource{
+	for dataSource, expected := range map[string]*Connector{
 		"mysqlx://my_user:my_password@127.0.0.1:33060/world_x?time_zone=UTC": {
 			Host:             "127.0.0.1",
 			Port:             33060,
@@ -27,14 +27,14 @@ func TestParseDataSource(t *testing.T) {
 			SessionVariables: map[string]string{"time_zone": "UTC"},
 		},
 	} {
-		t.Run(s, func(t *testing.T) {
+		t.Run(dataSource, func(t *testing.T) {
 			t.Parallel()
 
-			actual, err := ParseDataSource(s)
+			actual, err := ParseDataSource(dataSource)
 			require.NoError(t, err)
 			actual.Trace = nil // "Func values are deeply equal if both are nil; otherwise they are not deeply equal."
 			assert.Equal(t, expected, actual)
-			assert.Equal(t, s, actual.URL().String())
+			assert.Equal(t, dataSource, actual.URL().String())
 		})
 	}
 }

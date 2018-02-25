@@ -79,23 +79,23 @@ type ColumnType struct {
 	// TODO more checks
 }
 
-func dataSource(t *testing.T, database string) *DataSource {
+func connector(t *testing.T, database string) *Connector {
 	t.Helper()
 
 	env := os.Getenv("MYSQLX_TEST_DATASOURCE")
 	require.NotEmpty(t, env, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
-	ds, err := ParseDataSource(env)
+	connector, err := ParseDataSource(env)
 	require.NoError(t, err)
-	ds.Database = database
-	ds.Trace = t.Logf
-	return ds
+	connector.Database = database
+	connector.Trace = t.Logf
+	return connector
 }
 
 func openDB(t *testing.T, database string) *sql.DB {
 	t.Helper()
 
-	dataSource := dataSource(t, database)
-	db := sql.OpenDB(dataSource)
+	connector := connector(t, database)
+	db := sql.OpenDB(connector)
 	require.NoError(t, db.Ping())
 	return db
 }
@@ -595,10 +595,10 @@ func TestNoDatabase(t *testing.T) {
 }
 
 func TestInvalidPassword(t *testing.T) {
-	dataSource := dataSource(t, "")
-	dataSource.Password = "invalid password"
+	connector := connector(t, "")
+	connector.Password = "invalid password"
 
-	db := sql.OpenDB(dataSource)
+	db := sql.OpenDB(connector)
 	assert.Equal(t, 0, db.Stats().OpenConnections)
 	defer db.Close()
 
