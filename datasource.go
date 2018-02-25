@@ -24,6 +24,13 @@ const (
 	AuthMySQL41 AuthMethod = "MYSQL41"
 )
 
+// Trace function signature.
+type TraceFunc func(format string, v ...interface{})
+
+// noTrace is a trace functions which does nothing.
+// TODO check it is inlined and eliminated by compiler.
+func noTrace(string, ...interface{}) {}
+
 type DataSource struct {
 	Host     string
 	Port     uint16
@@ -96,9 +103,6 @@ func ParseDataSource(u *url.URL) (*DataSource, error) {
 			default:
 				return nil, fmt.Errorf("unexpected value for %q: %q", k, v)
 			}
-
-		case "_trace":
-			ds.Trace = getTracef(v)
 
 		default:
 			return nil, fmt.Errorf("unexpected parameter %q", k)

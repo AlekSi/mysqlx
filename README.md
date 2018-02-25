@@ -25,7 +25,6 @@ It requires Go 1.10+.
 ## Datasource parameters
 
 * `_auth-method`
-* `_trace`
 
 ## TODO
 * https://dev.mysql.com/doc/mysql-shell-excerpt/5.7/en/mysql-shell-connection-using-uri.html

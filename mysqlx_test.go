@@ -80,27 +80,25 @@ type ColumnType struct {
 	// TODO more checks
 }
 
-func dataSource(t *testing.T, database string) *url.URL {
+func dataSource(t *testing.T, database string) *DataSource {
 	t.Helper()
-	setTestTracef(t.Name(), t.Logf)
 
-	ds := os.Getenv("MYSQLX_TEST_DATASOURCE")
-	require.NotEmpty(t, ds, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
-	u, err := url.Parse(ds)
+	env := os.Getenv("MYSQLX_TEST_DATASOURCE")
+	require.NotEmpty(t, env, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
+	u, err := url.Parse(env)
 	require.NoError(t, err)
-	u.Path = database
-	q := u.Query()
-	q.Set("_trace", t.Name())
-	u.RawQuery = q.Encode()
-	return u
+	ds, err := ParseDataSource(u)
+	require.NoError(t, err)
+	ds.Database = database
+	ds.Trace = t.Logf
+	return ds
 }
 
 func openDB(t *testing.T, database string) *sql.DB {
 	t.Helper()
 
 	dataSource := dataSource(t, database)
-	db, err := sql.Open("mysqlx", dataSource.String())
-	require.NoError(t, err)
+	db := sql.OpenDB(dataSource)
 	require.NoError(t, db.Ping())
 	return db
 }
@@ -601,14 +599,13 @@ func TestNoDatabase(t *testing.T) {
 
 func TestInvalidPassword(t *testing.T) {
 	dataSource := dataSource(t, "")
-	dataSource.User = url.UserPassword(dataSource.User.Username(), "invalid password")
+	dataSource.Password = "invalid password"
 
-	db, err := sql.Open("mysqlx", dataSource.String())
-	require.NoError(t, err)
+	db := sql.OpenDB(dataSource)
 	assert.Equal(t, 0, db.Stats().OpenConnections)
 	defer db.Close()
 
-	err = db.Ping()
+	err := db.Ping()
 	require.Equal(t, &Error{Severity: SeverityFatal, Code: 1045, SQLState: "HY000", Msg: "Invalid user or password"}, err)
 	assert.Equal(t, 0, db.Stats().OpenConnections)
 }
