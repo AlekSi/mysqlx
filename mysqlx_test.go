@@ -10,6 +10,7 @@ package mysqlx
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"os"
@@ -605,4 +606,28 @@ func TestInvalidPassword(t *testing.T) {
 	err := db.Ping()
 	require.Equal(t, &Error{Severity: SeverityFatal, Code: 1045, SQLState: "HY000", Msg: "Invalid user or password"}, err)
 	assert.Equal(t, 0, db.Stats().OpenConnections)
+}
+
+func TestConnectionClose(t *testing.T) {
+	db := openDB(t, "")
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	conn, err := db.Conn(context.Background())
+	require.NoError(t, err)
+
+	var i int
+	err = conn.QueryRowContext(context.Background(), "SELECT 1").Scan(&i)
+	assert.NoError(t, err)
+
+	connectionsMap.get().transport.Close()
+
+	err = conn.QueryRowContext(context.Background(), "SELECT 1").Scan(&i)
+	assert.Equal(t, driver.ErrBadConn, err)
+
+	err = conn.Close()
+	assert.Equal(t, sql.ErrConnDone, err)
+
+	err = db.QueryRow("SELECT 1").Scan(&i)
+	assert.NoError(t, err)
 }

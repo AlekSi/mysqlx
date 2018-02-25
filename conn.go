@@ -72,25 +72,26 @@ func authData(database, username, password string, authData []byte) []byte {
 // conn is assumed to be stateful.
 type conn struct {
 	transport net.Conn
-	tracef    TraceFunc
+	tracef    func(format string, v ...interface{})
 
 	closeOnce sync.Once
 	closeErr  error
 }
 
-func newConn(transport net.Conn, traceF TraceFunc) *conn {
+func newConn(transport net.Conn, traceF func(format string, v ...interface{})) *conn {
 	if traceF == nil {
 		traceF = noTrace
 	}
 
-	local, remote := transport.LocalAddr().String(), transport.RemoteAddr().String()
-	traceF("+++ connection created: %s->%s", local, remote)
-	connectionCreated(local, remote)
-
-	return &conn{
+	c := &conn{
 		transport: transport,
 		tracef:    traceF,
 	}
+	local, remote := transport.LocalAddr().String(), transport.RemoteAddr().String()
+	traceF("+++ connection opened: %s->%s", local, remote)
+	connectionOpened(c)
+
+	return c
 }
 
 func open(ctx context.Context, connector *Connector) (*conn, error) {
@@ -370,16 +371,15 @@ func (c *conn) authPlain(ctx context.Context, database, username, password strin
 
 func (c *conn) close(err error) error {
 	c.closeOnce.Do(func() {
-		local, remote := c.transport.LocalAddr().String(), c.transport.RemoteAddr().String()
 		c.closeErr = err
 		e := c.transport.Close()
 		if c.closeErr == nil {
 			c.closeErr = e
 		}
-		connectionClosed(local, remote)
+		connectionClosed(c)
+		c.tracef("--- connection closed: %s->%s", c.transport.LocalAddr(), c.transport.RemoteAddr())
 	})
 
-	c.tracef("--- connection closed: %s->%s", c.transport.LocalAddr(), c.transport.RemoteAddr())
 	return c.closeErr
 }
 
@@ -681,7 +681,7 @@ func (c *conn) CheckNamedValue(arg *driver.NamedValue) error {
 func (c *conn) writeMessage(ctx context.Context, m proto.Message) error {
 	deadline, _ := ctx.Deadline()
 	if err := c.transport.SetWriteDeadline(deadline); err != nil {
-		return err
+		return driver.ErrBadConn
 	}
 
 	b, err := proto.Marshal(m)
@@ -716,7 +716,10 @@ func (c *conn) writeMessage(ctx context.Context, m proto.Message) error {
 	binary.LittleEndian.PutUint32(head[:], uint32(len(b))+1)
 	head[4] = byte(t)
 	_, err = (&net.Buffers{head[:], b}).WriteTo(c.transport) // use writev(2) if available
-	return err
+	if err != nil {
+		return driver.ErrBadConn
+	}
+	return nil
 }
 
 // ReadMessage reads and returns one next protocol message, or low-level error.
@@ -726,13 +729,13 @@ func (c *conn) writeMessage(ctx context.Context, m proto.Message) error {
 func ReadMessage(r io.Reader) (proto.Message, []byte, error) {
 	var head [5]byte
 	if _, err := io.ReadFull(r, head[:]); err != nil {
-		return nil, nil, err
+		return nil, nil, driver.ErrBadConn
 	}
 
 	buf := make([]byte, binary.LittleEndian.Uint32(head[:])+4)
 	copy(buf, head[:])
 	if _, err := io.ReadFull(r, buf[5:]); err != nil {
-		return nil, nil, err
+		return nil, nil, driver.ErrBadConn
 	}
 
 	t := mysqlx.ServerMessages_Type(buf[4])
@@ -814,11 +817,11 @@ func ReadMessage(r io.Reader) (proto.Message, []byte, error) {
 func (c *conn) readMessage(ctx context.Context) (proto.Message, error) {
 	deadline, _ := ctx.Deadline()
 	if err := c.transport.SetReadDeadline(deadline); err != nil {
-		return nil, err
+		return nil, driver.ErrBadConn
 	}
 	m, _, err := ReadMessage(c.transport)
 	if err != nil {
-		return nil, err
+		return nil, driver.ErrBadConn
 	}
 	c.tracef("<<< %T %v", m, m)
 	return m, nil

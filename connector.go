@@ -27,10 +27,7 @@ const (
 // noTrace is a trace functions which does nothing.
 func noTrace(string, ...interface{}) {}
 
-// Trace function signature.
-type TraceFunc func(format string, v ...interface{})
-
-// It implements database/sql/driver.Connector interface.
+// Connector implements database/sql/driver.Connector interface.
 type Connector struct {
 	Host     string
 	Port     uint16
@@ -42,7 +39,7 @@ type Connector struct {
 
 	SessionVariables map[string]string
 
-	Trace TraceFunc
+	Trace func(format string, v ...interface{})
 }
 
 // Connect returns a new connection to the database.
