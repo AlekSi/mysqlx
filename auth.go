@@ -17,7 +17,7 @@ import (
 // https://github.com/mysql/mysql-server/blob/mysql-5.7.19/rapid/plugin/x/mysqlxtest_src/mysql41_hash.cc
 func scrambleMySQL41(password string, authData []byte) []byte {
 	hash1 := sha1.Sum([]byte(password))
-	hash2 := sha1.Sum([]byte(hash1[:]))
+	hash2 := sha1.Sum(hash1[:])
 
 	h := sha1.New()
 	h.Write(authData)
