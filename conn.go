@@ -378,7 +378,7 @@ func (c *conn) Close() error {
 
 // Begin starts and returns a new transaction.
 func (c *conn) Begin() (driver.Tx, error) {
-	if _, err := c.Exec("BEGIN", nil); err != nil {
+	if _, err := c.ExecContext(context.Background(), "BEGIN", nil); err != nil {
 		return nil, err
 	}
 	return &tx{

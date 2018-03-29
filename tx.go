@@ -8,6 +8,7 @@
 package mysqlx
 
 import (
+	"context"
 	"database/sql/driver"
 )
 
@@ -20,13 +21,13 @@ type tx struct {
 
 // Commit commits the transaction.
 func (t *tx) Commit() error {
-	_, err := t.c.Exec("COMMIT", nil)
+	_, err := t.c.ExecContext(context.Background(), "COMMIT", nil)
 	return err
 }
 
 // Rollback aborts the transaction.
 func (t *tx) Rollback() error {
-	_, err := t.c.Exec("ROLLBACK", nil)
+	_, err := t.c.ExecContext(context.Background(), "ROLLBACK", nil)
 	return err
 }
 
