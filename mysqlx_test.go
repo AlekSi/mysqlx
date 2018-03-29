@@ -620,7 +620,7 @@ func TestConnectionClose(t *testing.T) {
 	err = conn.QueryRowContext(context.Background(), "SELECT 1").Scan(&i)
 	assert.NoError(t, err)
 
-	connectionsMap.get().transport.Close()
+	testConnections.get().transport.Close()
 
 	err = conn.QueryRowContext(context.Background(), "SELECT 1").Scan(&i)
 	assert.Equal(t, driver.ErrBadConn, err)

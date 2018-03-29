@@ -8,5 +8,7 @@
 package mysqlx
 
 func init() {
-	trackConnections = true
+	testConnections = &trackedConnections{
+		m: make(map[*conn]struct{}),
+	}
 }

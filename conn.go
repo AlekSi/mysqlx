@@ -40,7 +40,7 @@ const rowsCap = 1
 // conn is assumed to be stateful.
 type conn struct {
 	transport net.Conn
-	tracef    func(format string, v ...interface{})
+	tracef    func(format string, v ...interface{}) // can't be nil
 
 	closeOnce sync.Once
 	closeErr  error

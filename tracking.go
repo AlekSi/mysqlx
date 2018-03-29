@@ -13,16 +13,19 @@ import (
 	"sync"
 )
 
-type connectionsMapType map[*conn]struct{}
+type trackedConnections struct {
+	l sync.Mutex
+	m map[*conn]struct{}
+}
 
-func (cmt connectionsMapType) get() *conn {
-	connectionsM.Lock()
-	defer connectionsM.Unlock()
+func (tc *trackedConnections) get() *conn {
+	tc.l.Lock()
+	defer tc.l.Unlock()
 
-	if len(connectionsMap) != 1 {
-		panic(fmt.Errorf("expected 1 connection, got %d", len(connectionsMap)))
+	if len(tc.m) != 1 {
+		panic(fmt.Errorf("expected 1 connection, got %d", len(tc.m)))
 	}
-	for c := range connectionsMap {
+	for c := range tc.m {
 		return c
 	}
 	panic("not reached")
@@ -31,27 +34,26 @@ func (cmt connectionsMapType) get() *conn {
 var (
 	connectionsProfile = pprof.NewProfile("github.com/AlekSi/mysqlx.connections")
 
-	trackConnections bool
-	connectionsM     sync.Mutex
-	connectionsMap   = make(connectionsMapType)
+	// initialized in tracking_test.go for testing only
+	testConnections *trackedConnections
 )
 
 func connectionOpened(c *conn) {
 	connectionsProfile.Add(c, 1)
 
-	if trackConnections {
-		connectionsM.Lock()
-		connectionsMap[c] = struct{}{}
-		connectionsM.Unlock()
+	if testConnections != nil {
+		testConnections.l.Lock()
+		testConnections.m[c] = struct{}{}
+		testConnections.l.Unlock()
 	}
 }
 
 func connectionClosed(c *conn) {
 	connectionsProfile.Remove(c)
 
-	if trackConnections {
-		connectionsM.Lock()
-		delete(connectionsMap, c)
-		connectionsM.Unlock()
+	if testConnections != nil {
+		testConnections.l.Lock()
+		delete(testConnections.m, c)
+		testConnections.l.Unlock()
 	}
 }

@@ -39,7 +39,7 @@ type Connector struct {
 
 	SessionVariables map[string]string
 
-	Trace func(format string, v ...interface{})
+	Trace func(format string, v ...interface{}) // may be nil
 }
 
 // Connect returns a new connection to the database.
