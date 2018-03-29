@@ -2,14 +2,18 @@ all: test
 
 export MYSQLX_TEST_DATASOURCE ?= mysqlx://my_user:my_password@127.0.0.1:33060/?_auth-method=PLAIN&time_zone=UTC
 
-build:
+init:
+	go get -u gopkg.in/alecthomas/gometalinter.v2
+	gometalinter.v2 --install
+
+install:
 	go test -v -i
 	go test -v -i -race
 	go install -v
 	go install -v -race
 	go vet .
 
-test: build
+test: install
 	go test -race -tags gofuzzgen
 	go test -v -coverprofile=coverage.txt
 
@@ -18,6 +22,9 @@ cover: test
 
 bench: test
 	go test -run=NONE -bench=. -benchtime=3s -count=5 -benchmem | tee bench.txt
+
+check: install
+	-gometalinter.v2 --tests --deadline=60s ./...
 
 proto:
 	cd internal && go run compile.go
