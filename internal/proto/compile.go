@@ -45,8 +45,9 @@ func main() {
 			log.Fatal(err)
 		}
 
+		// go get -u github.com/gogo/protobuf/protoc-gen-gofast
 		mapping[i] = fmt.Sprintf("M%s=github.com/AlekSi/mysqlx/internal/proto/%s", f, packageName)
-		commands[i] = []string{"protoc", "--go_out=import_path=" + packageName + ",%s:" + packageName, f}
+		commands[i] = []string{"protoc", "--gofast_out=import_path=" + packageName + ",%s:" + packageName, f}
 	}
 
 	// for _, m := range mapping {
