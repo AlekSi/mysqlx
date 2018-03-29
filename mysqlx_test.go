@@ -289,7 +289,7 @@ func TestQueryData(t *testing.T) {
 		{`SELECT CAST(NULL AS UNSIGNED)`, nil, nil},
 		{`SELECT CAST(? AS UNSIGNED)`, []interface{}{nil}, nil},
 
-		// floats are returned as strings
+		// floats are returned as DECIMAL
 		{`SELECT 12.3401`, nil, "12.3401"},
 		{`SELECT ?`, []interface{}{12.3401}, "12.3401"},
 

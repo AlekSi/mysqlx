@@ -75,7 +75,7 @@ func (r *rows) Columns() []string {
 
 // Close closes the rows iterator.
 func (r *rows) Close() error {
-	// TODO limit a number of messages to drain there? and close connection?
+	// TODO limit a number of messages to drain there? and close connection? and return driver.ErrBadConn?
 
 	// drain messages until r.rows is closed in runReader
 	for range r.rows {
