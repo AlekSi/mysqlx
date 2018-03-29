@@ -80,31 +80,31 @@ type ColumnType struct {
 	// TODO more checks
 }
 
-func connector(t *testing.T, database string) *Connector {
-	t.Helper()
+func connector(tb testing.TB, database string) *Connector {
+	tb.Helper()
 
 	env := os.Getenv("MYSQLX_TEST_DATASOURCE")
-	require.NotEmpty(t, env, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
+	require.NotEmpty(tb, env, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
 	connector, err := ParseDataSource(env)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 	connector.Database = database
-	connector.Trace = t.Logf
+	connector.Trace = tb.Logf
 	return connector
 }
 
-func openDB(t *testing.T, database string) *sql.DB {
-	t.Helper()
+func openDB(tb testing.TB, database string) *sql.DB {
+	tb.Helper()
 
-	connector := connector(t, database)
+	connector := connector(tb, database)
 	db := sql.OpenDB(connector)
-	require.NoError(t, db.Ping())
+	require.NoError(tb, db.Ping())
 	return db
 }
 
-func closeDB(t *testing.T, db *sql.DB) {
-	t.Helper()
+func closeDB(tb testing.TB, db *sql.DB) {
+	tb.Helper()
 
-	assert.NoError(t, db.Close())
+	assert.NoError(tb, db.Close())
 }
 
 func TestQueryTableCity(t *testing.T) {
@@ -651,4 +651,26 @@ func TestDriverMethods(t *testing.T) {
 	conn, err = connector2.Connect(context.Background())
 	require.NoError(t, err)
 	checkConn(conn)
+}
+
+func BenchmarkTableCity(b *testing.B) {
+	connector := connector(b, "world_x")
+	connector.Trace = nil
+	db := sql.OpenDB(connector)
+	require.NoError(b, db.Ping())
+	defer closeDB(b, db)
+
+	var rows *sql.Rows
+	var err error
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rows, err = db.Query("SELECT ID, Name, District, Info FROM city WHERE CountryCode = ?", "RUS")
+		if err != nil {
+			b.Fatal(err)
+		}
+		if err = rows.Close(); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
 }

@@ -35,7 +35,6 @@ Parameters starting with `_` are listed below:
 * More tests for correct connection closing.
 * More concurrent tests.
 * Benchmarks.
-* Support for https://github.com/gogo/protobuf (?)
 * Charsets.
 * Time zones.
 * Real prepared statements.

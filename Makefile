@@ -3,6 +3,7 @@ all: test
 export MYSQLX_TEST_DATASOURCE ?= mysqlx://my_user:my_password@127.0.0.1:33060/?_auth-method=PLAIN&time_zone=UTC
 
 init:
+	go get -u golang.org/x/perf/cmd/benchstat
 	go get -u gopkg.in/alecthomas/gometalinter.v2
 	gometalinter.v2 --install
 
