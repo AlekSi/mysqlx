@@ -1,4 +1,11 @@
-go-fuzz/
+/vendor/
+Gopkg.toml
+Gopkg.lock
+go.mod
+go.sum
+
+/go-fuzz/
+
 *.pem
 *.txt
 *.zip

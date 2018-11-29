@@ -31,11 +31,14 @@ before_script:
   - docker-compose up -d
 
 script:
-  - make init install
+  - make install
+
   - go run -v internal/wait.go
   - make seed
-  - make cover
-  - make check
+
+  - make test
+  - make test-race
+  - make test-cover
 
 after_success:
   - bash <(curl -s https://codecov.io/bash) -X fix
