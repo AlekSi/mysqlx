@@ -14,6 +14,6 @@
 # Running Man-In-The-Middle proxy
 
 ```
-docker cp mysqlx_mysql_1:/var/lib/mysql/server-cert.pem internal/
-docker cp mysqlx_mysql_1:/var/lib/mysql/server-key.pem internal/
+docker cp mysqlx:/var/lib/mysql/server-cert.pem internal/
+docker cp mysqlx:/var/lib/mysql/server-key.pem internal/
 ```

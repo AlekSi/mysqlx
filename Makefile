@@ -35,7 +35,7 @@ fuzz: test
 	go-fuzz -bin=mysqlx-fuzz.zip -workdir=go-fuzz/unmarshalDecimal
 
 seed:
-	docker exec -ti mysqlx_mysql_1 sh -c 'mysql < /test_db/mysql/world_x/world_x.sql'
-	docker exec -ti mysqlx_mysql_1 mysql -e "GRANT ALL ON world_x.* TO 'my_user'@'%';"
+	docker exec -ti mysqlx sh -c 'mysql < /test_db/mysql/world_x/world_x.sql'
+	docker exec -ti mysqlx mysql -e "GRANT ALL ON world_x.* TO 'my_user'@'%';"
 
 .PHONY: fuzz
