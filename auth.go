@@ -27,7 +27,7 @@ func scrambleMySQL41(password string, authData []byte) []byte {
 	for i := range res {
 		res[i] ^= hash1[i]
 	}
-	return res[:]
+	return res
 }
 
 func authDataMySQL41(database, username, password string, authData []byte) ([]byte, error) {
