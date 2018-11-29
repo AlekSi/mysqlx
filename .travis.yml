@@ -4,14 +4,17 @@ language: go
 
 go:
   - 1.10.x
+  - 1.11.x
   - master
 
 go_import_path: github.com/AlekSi/mysqlx
 
 env:
+  global:
+    - MYSQLX_TEST_DATASOURCE='mysqlx://my_user:my_password@127.0.0.1:33060/?_auth-method=PLAIN&time_zone=UTC'
   matrix:
-    - MYSQL_IMAGE=mysql/mysql-server:5.7 MYSQLX_TEST_DATASOURCE='mysqlx://my_user:my_password@127.0.0.1:33060/?_auth-method=PLAIN&time_zone=UTC'
-    - MYSQL_IMAGE=mysql/mysql-server:8.0 MYSQLX_TEST_DATASOURCE='mysqlx://my_user:my_password@127.0.0.1:33060/?_auth-method=PLAIN&time_zone=UTC'
+    - MYSQL_IMAGE=mysql/mysql-server:5.7
+    - MYSQL_IMAGE=mysql/mysql-server:8.0
 
 services:
   - docker
