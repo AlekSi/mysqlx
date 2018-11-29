@@ -107,6 +107,8 @@ func closeDB(tb testing.TB, db *sql.DB) {
 	assert.NoError(tb, db.Close())
 }
 
+var _, noLastInsertIdErr = driver.RowsAffected(0).LastInsertId()
+
 func TestQueryTableCity(t *testing.T) {
 	t.Parallel()
 	db := openDB(t, "world_x")
@@ -452,7 +454,7 @@ func TestExec(t *testing.T) {
 	res, err := db.Exec("CREATE TEMPORARY TABLE TestExec (id int AUTO_INCREMENT, PRIMARY KEY (id))")
 	require.NoError(t, err)
 	id, err := res.LastInsertId()
-	assert.EqualError(t, err, "no LastInsertId available")
+	assert.Equal(t, noLastInsertIdErr, err)
 	assert.Equal(t, int64(0), id)
 	ra, err := res.RowsAffected()
 	assert.NoError(t, err)
@@ -470,7 +472,7 @@ func TestExec(t *testing.T) {
 	res, err = db.Exec("UPDATE TestExec SET id = ? WHERE id = ?", 3, 1)
 	require.NoError(t, err)
 	id, err = res.LastInsertId()
-	assert.EqualError(t, err, "no LastInsertId available")
+	assert.Equal(t, noLastInsertIdErr, err)
 	assert.Equal(t, int64(0), id)
 	ra, err = res.RowsAffected()
 	assert.NoError(t, err)
@@ -481,7 +483,7 @@ func TestExec(t *testing.T) {
 	res, err = stmt.Exec(4, 2)
 	require.NoError(t, err)
 	id, err = res.LastInsertId()
-	assert.EqualError(t, err, "no LastInsertId available")
+	assert.Equal(t, noLastInsertIdErr, err)
 	assert.Equal(t, int64(0), id)
 	ra, err = res.RowsAffected()
 	assert.NoError(t, err)
@@ -497,7 +499,7 @@ func TestExecQuery(t *testing.T) {
 	res, err := db.Exec("SELECT 1")
 	assert.NoError(t, err)
 	id, err := res.LastInsertId()
-	assert.EqualError(t, err, "no LastInsertId available")
+	assert.Equal(t, noLastInsertIdErr, err)
 	assert.Equal(t, int64(0), id)
 	ra, err := res.RowsAffected()
 	assert.NoError(t, err)
