@@ -47,7 +47,7 @@ func unmarshalDecimal(value []byte) (string, error) {
 			return "", fmt.Errorf("unmarshalDecimal: failed to parse decimal %#v", value)
 		}
 		s += btoa[h]
-		sign = sign << 4
+		sign <<= 4
 	}
 	if scale := int(value[0]); scale != 0 {
 		if scale >= len(s) {
