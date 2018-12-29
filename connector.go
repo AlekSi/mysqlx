@@ -118,11 +118,11 @@ func ParseDataSource(dataSource string) (*Connector, error) {
 		case "_dial-timeout":
 			connector.DialTimeout, err = time.ParseDuration(v)
 			if err != nil {
-				dt, err := strconv.Atoi(v)
+				dt, err := strconv.ParseFloat(v, 64)
 				if err != nil {
 					return nil, fmt.Errorf("unexpected value for %q: %q", k, v)
 				}
-				connector.DialTimeout = time.Duration(dt) * time.Second
+				connector.DialTimeout = time.Duration(dt * float64(time.Second))
 			}
 
 		default:
