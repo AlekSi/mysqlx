@@ -26,6 +26,7 @@ and are set whenever a connection is opened.
 Parameters starting with `_` are listed below:
 
 * `_auth-method`: `PLAIN` or `MYSQL41` (see [AuthMethod type](https://godoc.org/github.com/AlekSi/mysqlx#AuthMethod))
+* `_dial-timeout`
 
 ## TODO
 

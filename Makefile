@@ -1,6 +1,6 @@
 all: test
 
-export MYSQLX_TEST_DATASOURCE ?= mysqlx://my_user:my_password@127.0.0.1:33060/?_auth-method=PLAIN&time_zone=UTC
+export MYSQLX_TEST_DATASOURCE ?= mysqlx://my_user:my_password@127.0.0.1:33060/?_auth-method=PLAIN&_dial-timeout=1s&time_zone=UTC
 
 install:
 	go install -v ./...

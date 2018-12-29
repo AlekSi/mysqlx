@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type AuthMethod string
@@ -35,7 +36,8 @@ type Connector struct {
 	Username string
 	Password string
 
-	AuthMethod AuthMethod
+	AuthMethod  AuthMethod
+	DialTimeout time.Duration
 
 	SessionVariables map[string]string
 
@@ -111,6 +113,16 @@ func ParseDataSource(dataSource string) (*Connector, error) {
 				connector.AuthMethod = AuthMySQL41
 			default:
 				return nil, fmt.Errorf("unexpected value for %q: %q", k, v)
+			}
+
+		case "_dial-timeout":
+			connector.DialTimeout, err = time.ParseDuration(v)
+			if err != nil {
+				dt, err := strconv.Atoi(v)
+				if err != nil {
+					return nil, fmt.Errorf("unexpected value for %q: %q", k, v)
+				}
+				connector.DialTimeout = time.Duration(dt) * time.Second
 			}
 
 		default:

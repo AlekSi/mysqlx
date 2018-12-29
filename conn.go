@@ -63,6 +63,12 @@ func newConn(transport net.Conn, traceF func(format string, v ...interface{})) *
 }
 
 func open(ctx context.Context, connector *Connector) (*conn, error) {
+	if connector.DialTimeout != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, connector.DialTimeout)
+		defer cancel()
+	}
+
 	conn, err := new(net.Dialer).DialContext(ctx, "tcp", connector.hostPort())
 	if err != nil {
 		return nil, err
