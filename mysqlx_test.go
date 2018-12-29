@@ -83,6 +83,10 @@ type ColumnType struct {
 func connector(tb testing.TB, database string) *Connector {
 	tb.Helper()
 
+	if testing.Short() {
+		tb.Skip("skipping in short mode")
+	}
+
 	env := os.Getenv("MYSQLX_TEST_DATASOURCE")
 	require.NotEmpty(tb, env, "Please set environment variable MYSQLX_TEST_DATASOURCE.")
 	connector, err := ParseDataSource(env)
