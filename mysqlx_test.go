@@ -22,10 +22,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type String string
+
 type City struct {
 	ID       int
 	Name     string
-	District string
+	District String
 	Info     string
 }
 
